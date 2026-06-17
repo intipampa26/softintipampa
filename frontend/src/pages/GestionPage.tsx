@@ -1,0 +1,836 @@
+import { useState, useMemo } from 'react';
+import {
+  Search, Plus, Pencil, Trash2, Package, Ship, FileText,
+  CheckCircle2, ChevronRight, X, Calendar, User, Hash,
+  Clock, CheckCheck, Circle, Filter, BarChart3, TrendingUp,
+  MapPin, Weight, Send, Truck,
+} from 'lucide-react';
+import { PreventaEnvioMuestrasModal }   from '../components/PreventaEnvioMuestrasModal';
+import { PreventaEnvioCotizacionModal } from '../components/PreventaEnvioCotizacionModal';
+import { AlistadoCompromisoVentaModal } from '../components/AlistadoCompromisoVentaModal';
+import { AlistadoAsignacionLotesModal } from '../components/AlistadoAsignacionLotesModal';
+import { AlistadoDespachoModal }        from '../components/AlistadoDespachoModal';
+import { StepKey }                      from '@/contexts/FlowContext';
+
+const CP  = '#445D46';
+const CS  = '#5F7A61';
+const CL  = '#8BA989';
+const BG  = '#F7F8F7';
+const BD  = '#D9DDD8';
+const TX  = '#2C2C2C';
+
+type EstadoOrden = 'pre_venta' | 'alistado' | 'exportacion' | 'post_venta';
+type EstadoPaso  = 'completado' | 'en_proceso' | 'pendiente';
+
+interface OrdenVenta {
+  id: string;
+  cliente: string;
+  productor: string;
+  campana: string;
+  fecha: string;
+  estado: EstadoOrden;
+  lote: string;
+  cantidadKg: number;
+  destino: string;
+  tipoProducto: string;
+  montoUSD: number;
+}
+
+interface PasoTimeline {
+  label: string;
+  fecha: string;
+  hora: string;
+  responsable: string;
+  estado: EstadoPaso;
+}
+
+const ESTADO_CFG: Record<EstadoOrden, { label: string; badge: string; dot: string }> = {
+  pre_venta:   { label: 'Pre Venta',   badge: 'bg-amber-50  text-amber-700  border-amber-200',   dot: 'bg-amber-400'  },
+  alistado:    { label: 'Alistado',    badge: 'bg-sky-50    text-sky-700    border-sky-200',      dot: 'bg-sky-400'    },
+  exportacion: { label: 'Exportación', badge: 'bg-violet-50 text-violet-700 border-violet-200',  dot: 'bg-violet-400' },
+  post_venta:  { label: 'Post Venta',  badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400' },
+};
+
+const PASOS = [
+  'Registrado', 'Por subir documento', 'Recepcionado',
+  'Verificado', 'Convalidado', 'Procesado', 'Pagado', 'Resolución',
+];
+
+const RESPONSABLES = ['ops.garcia', 'ops.quispe', 'supervisor', 'adm.torres', 'aduanas.peru'];
+const HORAS = ['08:15', '09:30', '10:45', '11:00', '13:20', '14:35', '15:50', '16:10'];
+const FECHAS_BASE = [
+  '03/01/2026','06/01/2026','09/01/2026','12/01/2026',
+  '15/01/2026','20/01/2026','24/01/2026','28/01/2026',
+];
+
+function buildTimeline(completados: number): PasoTimeline[] {
+  return PASOS.map((label, i) => ({
+    label,
+    fecha:       i < completados ? FECHAS_BASE[i] : i === completados ? FECHAS_BASE[i] ?? '' : '',
+    hora:        i <= completados ? HORAS[i] : '',
+    responsable: i <= completados ? RESPONSABLES[i % RESPONSABLES.length] : '',
+    estado:      i < completados ? 'completado' : i === completados ? 'en_proceso' : 'pendiente',
+  }));
+}
+
+const ORDENES_INIT: OrdenVenta[] = [
+  { id:'ORD-2026-001', cliente:'Volcafe Perú S.A.C.',   productor:'Juan Carlos Ríos',   campana:'Campaña 2025/2026', fecha:'05/01/2026', estado:'post_venta',  lote:'LF-2026-001', cantidadKg:18000, destino:'Alemania',       tipoProducto:'Café verde',             montoUSD:248400 },
+  { id:'ORD-2026-002', cliente:'Sucafina S.A.',          productor:'María López Torres', campana:'Campaña 2025/2026', fecha:'10/01/2026', estado:'exportacion', lote:'LF-2026-002', cantidadKg:12500, destino:'Estados Unidos', tipoProducto:'Café pergamino',         montoUSD:172500 },
+  { id:'ORD-2026-003', cliente:'Olam International',     productor:'Pedro Huamán',       campana:'Campaña 2025/2026', fecha:'14/01/2026', estado:'exportacion', lote:'LF-2026-003', cantidadKg:9800,  destino:'Bélgica',        tipoProducto:'Cacao en grano',         montoUSD:112700 },
+  { id:'ORD-2026-004', cliente:'Nordic Approach AS',     productor:'Rosa Medina',        campana:'Campaña 2025/2026', fecha:'18/01/2026', estado:'alistado',    lote:'LF-2026-004', cantidadKg:4200,  destino:'Noruega',        tipoProducto:'Café especial SCA 85+',  montoUSD:75600  },
+  { id:'ORD-2026-005', cliente:'Caravela Coffee LLC',    productor:'Luis Vargas Díaz',   campana:'Campaña 2025/2026', fecha:'22/01/2026', estado:'alistado',    lote:'LF-2026-005', cantidadKg:6600,  destino:'Países Bajos',   tipoProducto:'Café verde',             montoUSD:91080  },
+  { id:'ORD-2026-006', cliente:'Trabocca B.V.',          productor:'Ana Sánchez',        campana:'Campaña 2025/2026', fecha:'25/01/2026', estado:'pre_venta',   lote:'LF-2026-006', cantidadKg:3000,  destino:'Países Bajos',   tipoProducto:'Café especial SCA 83+',  montoUSD:51000  },
+  { id:'ORD-2026-007', cliente:'Cofco International',    productor:'Carlos Pizarro',     campana:'Campaña 2025/2026', fecha:'28/01/2026', estado:'pre_venta',   lote:'LF-2026-007', cantidadKg:20000, destino:'China',          tipoProducto:'Cacao en grano',         montoUSD:230000 },
+  { id:'ORD-2026-008', cliente:'True Origins Coffee',    productor:'Elena Flores',       campana:'Campaña 2024/2025', fecha:'30/09/2025', estado:'post_venta',  lote:'LF-2025-012', cantidadKg:5400,  destino:'Dinamarca',      tipoProducto:'Café especial SCA 85+',  montoUSD:97200  },
+  { id:'ORD-2026-009', cliente:'Specialty Coffee UK',    productor:'Jorge Mendoza',      campana:'Campaña 2025/2026', fecha:'01/02/2026', estado:'pre_venta',   lote:'LF-2026-010', cantidadKg:7500,  destino:'Reino Unido',    tipoProducto:'Café verde',             montoUSD:103500 },
+];
+
+const TIMELINES: Record<string, PasoTimeline[]> = {
+  'ORD-2026-001': buildTimeline(8),
+  'ORD-2026-002': buildTimeline(6),
+  'ORD-2026-003': buildTimeline(5),
+  'ORD-2026-004': buildTimeline(3),
+  'ORD-2026-005': buildTimeline(3),
+  'ORD-2026-006': buildTimeline(1),
+  'ORD-2026-007': buildTimeline(0),
+  'ORD-2026-008': buildTimeline(8),
+  'ORD-2026-009': buildTimeline(0),
+};
+
+const CAMPANAS   = ['Campaña 2025/2026', 'Campaña 2024/2025'];
+const PRODUCTORES = [
+  'Juan Carlos Ríos','María López Torres','Pedro Huamán','Rosa Medina',
+  'Luis Vargas Díaz','Ana Sánchez','Carlos Pizarro','Elena Flores','Jorge Mendoza',
+];
+
+const INP = `w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200`;
+const inpStyle = { borderColor: BD, color: TX };
+
+function StatChip({ label, value, icon, accent }: { label: string; value: string | number; icon: React.ReactNode; accent?: string }) {
+  return (
+    <div className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3 border shadow-sm" style={{ borderColor: BD }}>
+      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: accent ?? `${CP}18` }}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-[0.62rem] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+        <p className="text-sm font-black leading-none mt-0.5" style={{ color: TX }}>{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ estado }: { estado: EstadoOrden }) {
+  const cfg = ESTADO_CFG[estado];
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.65rem] font-bold border ${cfg.badge}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+}
+
+type FlowModal = 'preventa' | 'cotizacion' | 'compromiso' | 'asignacion_lotes' | 'despacho';
+
+interface CardProps {
+  orden: OrdenVenta;
+  active: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onFlow: (type: FlowModal) => void;
+}
+
+function OrderCard({ orden, active, onSelect, onEdit, onDelete, onFlow }: CardProps) {
+  return (
+    <div
+      onClick={onSelect}
+      className="group relative bg-white rounded-2xl border cursor-pointer flex flex-col overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
+      style={{
+        borderColor: active ? CP : BD,
+        boxShadow: active
+          ? `0 0 0 2px ${CP}40, 0 4px 20px ${CP}20`
+          : '0 1px 4px rgba(0,0,0,0.06)',
+      }}
+    >
+      
+      {active && (
+        <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl" style={{ backgroundColor: CP }} />
+      )}
+
+      
+      <div className="px-4 pt-4 pb-3 flex items-start justify-between gap-2">
+        <div>
+          <p className="font-black text-xs uppercase tracking-widest" style={{ color: CP }}>{orden.id}</p>
+          <p className="text-[0.65rem] text-gray-400 mt-0.5 font-medium">{orden.tipoProducto}</p>
+        </div>
+        <StatusBadge estado={orden.estado} />
+      </div>
+
+      <div className="w-full h-px" style={{ backgroundColor: BG }} />
+
+      
+      <div className="px-4 py-3 flex-1 space-y-2">
+        <div className="flex items-center gap-2">
+          <User size={11} className="shrink-0" style={{ color: CL }} />
+          <span className="text-xs font-semibold truncate" style={{ color: TX }}>{orden.cliente}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <User size={11} className="shrink-0 opacity-60" style={{ color: CL }} />
+          <span className="text-[0.65rem] truncate text-gray-500">{orden.productor}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <BarChart3 size={11} className="shrink-0" style={{ color: CL }} />
+          <span className="text-[0.65rem] text-gray-500 truncate">{orden.campana}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Hash size={11} className="shrink-0" style={{ color: CL }} />
+          <span className="text-[0.65rem] font-mono text-gray-500">{orden.lote}</span>
+        </div>
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-1.5">
+            <Calendar size={10} style={{ color: CL }} />
+            <span className="text-[0.62rem] text-gray-400">{orden.fecha}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Weight size={10} style={{ color: CL }} />
+            <span className="text-[0.65rem] font-bold" style={{ color: TX }}>{orden.cantidadKg.toLocaleString()} kg</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <MapPin size={10} style={{ color: CL }} />
+          <span className="text-[0.62rem] text-gray-400">{orden.destino}</span>
+          <span className="ml-auto text-[0.62rem] font-semibold text-emerald-600">USD {orden.montoUSD.toLocaleString()}</span>
+        </div>
+      </div>
+
+      
+      <div className="px-4 py-2.5 border-t flex items-center justify-between" style={{ borderColor: BG, backgroundColor: BG }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); onSelect(); }}
+          className="flex items-center gap-1 text-[0.62rem] font-semibold transition-colors hover:underline"
+          style={{ color: CS }}
+        >
+          Ver timeline <ChevronRight size={9} />
+        </button>
+        <div className="flex items-center gap-1">
+
+          {orden.estado === 'pre_venta' && (<>
+            <button onClick={(e) => { e.stopPropagation(); onFlow('preventa'); }}
+              className="h-7 px-2 rounded-lg flex items-center gap-1 text-[0.58rem] font-bold transition-all hover:opacity-85"
+              style={{ backgroundColor: CP, color: '#fff' }} title="Envío de Muestras">
+              <Send size={9} /> Muestras
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onFlow('cotizacion'); }}
+              className="h-7 px-2 rounded-lg flex items-center gap-1 text-[0.58rem] font-bold transition-all hover:opacity-85"
+              style={{ backgroundColor: CS, color: '#fff' }} title="Envío de Cotización">
+              <FileText size={9} /> Cotiz.
+            </button>
+          </>)}
+
+          {orden.estado === 'alistado' && (<>
+            <button onClick={(e) => { e.stopPropagation(); onFlow('compromiso'); }}
+              className="h-7 px-2 rounded-lg flex items-center gap-1 text-[0.58rem] font-bold transition-all hover:opacity-85"
+              style={{ backgroundColor: CP, color: '#fff' }} title="Compromiso de Venta">
+              <CheckCircle2 size={9} /> Compromi.
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onFlow('asignacion_lotes'); }}
+              className="h-7 px-2 rounded-lg flex items-center gap-1 text-[0.58rem] font-bold transition-all hover:opacity-85"
+              style={{ backgroundColor: CS, color: '#fff' }} title="Asignación de Lotes">
+              <Package size={9} /> Lotes
+            </button>
+          </>)}
+
+          {orden.estado === 'exportacion' && (
+            <button onClick={(e) => { e.stopPropagation(); onFlow('despacho'); }}
+              className="h-7 px-2 rounded-lg flex items-center gap-1 text-[0.58rem] font-bold transition-all hover:opacity-85"
+              style={{ backgroundColor: CP, color: '#fff' }} title="Alistado y Despacho">
+              <Truck size={9} /> Despacho
+            </button>
+          )}
+
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:scale-105"
+            style={{ backgroundColor: '#e8f5e9', color: CP }} title="Editar">
+            <Pencil size={11} />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:scale-105"
+            style={{ backgroundColor: '#fdecea', color: '#c62828' }} title="Eliminar">
+            <Trash2 size={11} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-2xl border overflow-hidden animate-pulse" style={{ borderColor: BD }}>
+      <div className="px-4 pt-4 pb-3 flex justify-between">
+        <div className="space-y-1.5"><div className="h-3 w-24 bg-gray-100 rounded" /><div className="h-2 w-16 bg-gray-100 rounded" /></div>
+        <div className="h-5 w-20 bg-gray-100 rounded-full" />
+      </div>
+      <div className="px-4 py-3 space-y-2">
+        {[85, 65, 55, 45, 70].map(w => <div key={w} className="h-2.5 bg-gray-100 rounded" style={{ width: `${w}%` }} />)}
+      </div>
+      <div className="px-4 py-2.5 border-t flex justify-between" style={{ borderColor: BG, backgroundColor: BG }}>
+        <div className="h-2.5 w-16 bg-gray-100 rounded" />
+        <div className="flex gap-1"><div className="w-7 h-7 bg-gray-100 rounded-lg" /><div className="w-7 h-7 bg-gray-100 rounded-lg" /></div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ onNueva }: { onNueva: () => void }) {
+  return (
+    <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: `${CP}12` }}>
+        <Package size={28} style={{ color: CP }} />
+      </div>
+      <p className="font-black text-base uppercase tracking-wide mb-1" style={{ color: TX }}>Sin órdenes</p>
+      <p className="text-sm text-gray-400 mb-5">No hay órdenes que coincidan con los filtros.</p>
+      <button
+        onClick={onNueva}
+        className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        style={{ backgroundColor: CP }}
+      >
+        <Plus size={14} /> Agregar primera orden
+      </button>
+    </div>
+  );
+}
+
+function TimelineStep({ paso, index, isLast }: { paso: PasoTimeline; index: number; isLast: boolean }) {
+  const done    = paso.estado === 'completado';
+  const active  = paso.estado === 'en_proceso';
+  const pending = paso.estado === 'pendiente';
+
+  const cardBg     = done ? CP : active ? CS : '#F3F4F6';
+  const cardText   = done || active ? '#fff' : '#9CA3AF';
+  const borderCol  = done ? CP : active ? CS : BD;
+  const circleCol  = done ? CP : active ? CS : '#fff';
+  const circleBrd  = done ? CP : active ? CS : BD;
+
+  const Icon = done ? CheckCheck : active ? Clock : Circle;
+
+  return (
+    <div className="flex flex-col items-center shrink-0" style={{ width: 120 }}>
+      
+      <div
+        className="w-full rounded-xl p-2.5 text-center border transition-all duration-200 shadow-sm"
+        style={{ backgroundColor: cardBg, borderColor: borderCol, color: cardText }}
+      >
+        <p className="text-[0.58rem] font-black uppercase tracking-wide leading-tight mb-2">{paso.label}</p>
+        {!pending ? (
+          <>
+            <div className="flex items-center justify-center gap-0.5 mb-0.5">
+              <Calendar size={8} style={{ color: cardText, opacity: 0.75 }} />
+              <span className="text-[0.52rem] font-semibold opacity-90">{paso.fecha}</span>
+            </div>
+            <div className="flex items-center justify-center gap-0.5 mb-0.5">
+              <Clock size={8} style={{ color: cardText, opacity: 0.75 }} />
+              <span className="text-[0.52rem] opacity-85">{paso.hora}</span>
+            </div>
+            <div className="flex items-center justify-center gap-0.5">
+              <User size={8} style={{ color: cardText, opacity: 0.75 }} />
+              <span className="text-[0.52rem] opacity-80 truncate max-w-[80px]">{paso.responsable}</span>
+            </div>
+          </>
+        ) : (
+          <p className="text-[0.52rem] opacity-50">Pendiente</p>
+        )}
+      </div>
+
+      
+      <div className="flex items-center w-full mt-2.5">
+        <div className="flex-1 h-px" style={{ backgroundColor: index === 0 ? 'transparent' : done ? CP : BD }} />
+        <div
+          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${active ? 'ring-4 ring-green-200' : ''}`}
+          style={{
+            backgroundColor: circleCol,
+            borderColor:     circleBrd,
+          }}
+        >
+          <Icon size={10} className={done || active ? 'text-white' : 'text-gray-300'} />
+        </div>
+        <div className="flex-1 h-px" style={{ backgroundColor: isLast ? 'transparent' : done ? CP : BD }} />
+      </div>
+
+      <p className="text-[0.52rem] font-bold mt-1" style={{ color: done ? CP : active ? CS : '#9CA3AF' }}>
+        {String(index + 1).padStart(2, '0')}
+      </p>
+    </div>
+  );
+}
+
+function ProcessTimelineModal({ orden, onClose }: { orden: OrdenVenta; onClose: () => void }) {
+  const timeline    = TIMELINES[orden.id] ?? buildTimeline(0);
+  const completadas = timeline.filter(p => p.estado === 'completado').length;
+  const pct         = Math.round((completadas / timeline.length) * 100);
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-end sm:items-center justify-center p-0 sm:p-6"
+      style={{ backgroundColor: 'rgba(0,0,0,0.38)', backdropFilter: 'blur(12px) saturate(0.75)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        className="w-full sm:max-w-5xl rounded-t-3xl sm:rounded-3xl overflow-hidden flex flex-col"
+        style={{
+          background:     'rgba(255,255,255,0.88)',
+          backdropFilter: 'blur(28px) saturate(1.4)',
+          WebkitBackdropFilter: 'blur(28px) saturate(1.4)',
+          border:         '1px solid rgba(255,255,255,0.6)',
+          boxShadow:      '0 24px 60px rgba(0,0,0,0.22), 0 1px 0 rgba(255,255,255,0.8) inset',
+          maxHeight:      '90vh',
+        }}
+      >
+        
+        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: CP }}>
+              <TrendingUp size={14} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-black text-sm uppercase tracking-wide" style={{ color: TX }}>Vida de la Solicitud</p>
+              <p className="text-[0.62rem] truncate text-gray-400">
+                {orden.id} · {orden.cliente} · {orden.destino}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <StatusBadge estado={orden.estado} />
+            <div className="hidden sm:flex items-center gap-2">
+              <div className="w-20 h-1.5 rounded-full overflow-hidden bg-gray-200">
+                <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: CP }} />
+              </div>
+              <span className="text-[0.65rem] font-black" style={{ color: CP }}>{pct}%</span>
+            </div>
+            <span className="hidden sm:inline text-[0.62rem] text-gray-400">
+              {completadas}/{timeline.length} etapas
+            </span>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-black/06 transition-all"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        
+        <div className="overflow-x-auto px-5 py-6">
+          <div className="flex gap-2 min-w-max">
+            {timeline.map((paso, i) => (
+              <TimelineStep key={paso.label} paso={paso} index={i} isLast={i === timeline.length - 1} />
+            ))}
+          </div>
+        </div>
+
+        
+        <div className="px-5 py-3 border-t flex items-center justify-between" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+          <div className="flex items-center gap-2">
+            <div className="w-28 h-1 rounded-full overflow-hidden bg-gray-200">
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: CP }} />
+            </div>
+            <span className="text-[0.6rem] font-medium text-gray-400">
+              {completadas} de {timeline.length} etapas completadas
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-[0.65rem] font-semibold px-3 py-1.5 rounded-lg text-gray-500 hover:bg-black/05 transition-all"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ModalProps { initial?: OrdenVenta | null; onClose: () => void; onSave: (d: Partial<OrdenVenta>) => void; }
+
+function OrderModal({ initial, onClose, onSave }: ModalProps) {
+  const [form, setForm] = useState({
+    cliente:      initial?.cliente      ?? '',
+    productor:    initial?.productor    ?? '',
+    campana:      initial?.campana      ?? '',
+    fecha:        initial?.fecha        ?? '',
+    lote:         initial?.lote         ?? '',
+    cantidadKg:   initial?.cantidadKg   ?? 0,
+    destino:      initial?.destino      ?? '',
+    tipoProducto: initial?.tipoProducto ?? '',
+    montoUSD:     initial?.montoUSD     ?? 0,
+    estado:       (initial?.estado      ?? 'pre_venta') as EstadoOrden,
+  });
+
+  const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(f => ({ ...f, [k]: v }));
+
+  const field = (label: string, children: React.ReactNode) => (
+    <div>
+      <label className="block text-[0.65rem] font-bold uppercase tracking-wide mb-1.5" style={{ color: TX, opacity: 0.6 }}>{label}</label>
+      {children}
+    </div>
+  );
+
+  const inputCls = `${INP} focus:ring-green-600`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" style={{ backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col" style={{ maxHeight: '92vh' }}>
+        
+        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: BG }}>
+          <div>
+            <h2 className="font-black text-base uppercase tracking-wide" style={{ color: CP }}>
+              {initial ? 'Editar Orden' : 'Nueva Orden de Venta'}
+            </h2>
+            {initial && <p className="text-xs text-gray-400 mt-0.5">{initial.id}</p>}
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+            <X size={17} />
+          </button>
+        </div>
+
+        
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {field('Cliente', <input value={form.cliente} onChange={e => set('cliente', e.target.value)} className={inputCls} style={inpStyle} placeholder="Nombre del cliente…" />)}
+            {field('Productor', (
+              <select value={form.productor} onChange={e => set('productor', e.target.value)} className={inputCls} style={inpStyle}>
+                <option value="">Seleccionar…</option>
+                {PRODUCTORES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            ))}
+            {field('Campaña', (
+              <select value={form.campana} onChange={e => set('campana', e.target.value)} className={inputCls} style={inpStyle}>
+                <option value="">Seleccionar…</option>
+                {CAMPANAS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            ))}
+            {field('Fecha', <input type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} className={inputCls} style={inpStyle} />)}
+            {field('Lote', <input value={form.lote} onChange={e => set('lote', e.target.value)} className={inputCls} style={inpStyle} placeholder="LF-2026-…" />)}
+            {field('Tipo de producto', <input value={form.tipoProducto} onChange={e => set('tipoProducto', e.target.value)} className={inputCls} style={inpStyle} placeholder="Café verde, Cacao…" />)}
+            {field('Cantidad (kg)', <input type="number" min={0} value={form.cantidadKg} onChange={e => set('cantidadKg', Number(e.target.value))} className={inputCls} style={inpStyle} />)}
+            {field('Monto (USD)', <input type="number" min={0} value={form.montoUSD} onChange={e => set('montoUSD', Number(e.target.value))} className={inputCls} style={inpStyle} />)}
+            {field('Destino', <input value={form.destino} onChange={e => set('destino', e.target.value)} className={inputCls} style={inpStyle} placeholder="País destino…" />)}
+            {field('Estado', (
+              <select value={form.estado} onChange={e => set('estado', e.target.value as EstadoOrden)} className={inputCls} style={inpStyle}>
+                {(Object.entries(ESTADO_CFG) as [EstadoOrden, typeof ESTADO_CFG[EstadoOrden]][]).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
+            ))}
+          </div>
+        </div>
+
+        
+        <div className="px-6 py-4 border-t flex gap-3 shrink-0" style={{ borderColor: BG }}>
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors" style={{ borderColor: BD }}>
+            Cancelar
+          </button>
+          <button onClick={() => { onSave(form); onClose(); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90" style={{ backgroundColor: CP }}>
+            {initial ? 'Guardar cambios' : 'Crear orden'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteConfirm({ orden, onClose, onConfirm }: { orden: OrdenVenta; onClose: () => void; onConfirm: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="px-6 py-5 flex flex-col items-center text-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center">
+            <Trash2 size={22} className="text-red-500" />
+          </div>
+          <div>
+            <p className="font-black text-gray-800">¿Eliminar orden?</p>
+            <p className="text-sm text-gray-400 mt-1">
+              <span className="font-semibold text-gray-600">{orden.id}</span> · {orden.cliente} se eliminará permanentemente.
+            </p>
+          </div>
+        </div>
+        <div className="px-6 pb-5 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors" style={{ borderColor: BD }}>
+            Cancelar
+          </button>
+          <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors">
+            Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface FilterBarProps {
+  campana: string; setCampana: (v: string) => void;
+  productor: string; setProductor: (v: string) => void;
+  fecha: string; setFecha: (v: string) => void;
+  lote: string; setLote: (v: string) => void;
+  onBuscar: () => void;
+  onNueva: () => void;
+}
+
+function FilterBar({ campana, setCampana, productor, setProductor, fecha, setFecha, lote, setLote, onBuscar, onNueva }: FilterBarProps) {
+  const selCls = `${INP} pr-8 appearance-none bg-white focus:ring-green-600`;
+  const wrapCls = 'relative';
+
+  return (
+    <div className="bg-white border-b px-4 md:px-8 py-4" style={{ borderColor: BD }}>
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-end">
+
+        <div className={`${wrapCls} flex-1 min-w-[150px]`}>
+          <label className="block text-[0.62rem] font-bold uppercase tracking-wide mb-1.5 text-gray-500">Campaña</label>
+          <select value={campana} onChange={e => setCampana(e.target.value)} className={selCls} style={inpStyle}>
+            <option value="">Todas las campañas</option>
+            {CAMPANAS.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+
+        <div className={`${wrapCls} flex-1 min-w-[150px]`}>
+          <label className="block text-[0.62rem] font-bold uppercase tracking-wide mb-1.5 text-gray-500">Productor</label>
+          <select value={productor} onChange={e => setProductor(e.target.value)} className={selCls} style={inpStyle}>
+            <option value="">Todos los productores</option>
+            {PRODUCTORES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+
+        <div className={`${wrapCls} flex-1 min-w-[130px]`}>
+          <label className="block text-[0.62rem] font-bold uppercase tracking-wide mb-1.5 text-gray-500">Fecha</label>
+          <div className="relative">
+            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className={`${INP} pr-9 focus:ring-green-600`} style={inpStyle} />
+            <Calendar size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
+
+        <div className={`${wrapCls} flex-1 min-w-[120px]`}>
+          <label className="block text-[0.62rem] font-bold uppercase tracking-wide mb-1.5 text-gray-500">Lote</label>
+          <div className="relative">
+            <input value={lote} onChange={e => setLote(e.target.value)} onKeyDown={e => e.key === 'Enter' && onBuscar()} className={`${INP} pr-9 focus:ring-green-600`} style={inpStyle} placeholder="LF-2026-…" />
+            <Hash size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
+
+        <button
+          onClick={onBuscar}
+          className="h-[42px] w-11 shrink-0 rounded-xl border flex items-center justify-center hover:bg-gray-50 transition-colors"
+          style={{ borderColor: BD, color: TX }}
+          title="Buscar"
+        >
+          <Search size={16} />
+        </button>
+
+        <button
+          onClick={onNueva}
+          className="h-[42px] shrink-0 flex items-center gap-2 px-4 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 active:scale-[0.98] sm:whitespace-nowrap w-full sm:w-auto justify-center"
+          style={{ backgroundColor: CP }}
+        >
+          <Plus size={15} />
+          <span>Agregar Orden de Venta</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+type ModalType = 'create' | 'edit' | 'delete' | FlowModal | null;
+
+export function GestionPage() {
+  const [ordenes,        setOrdenes]        = useState<OrdenVenta[]>(ORDENES_INIT);
+  const [loading,        setLoading]        = useState(false);
+  const [modal,          setModal]          = useState<ModalType>(null);
+  const [selected,       setSelected]       = useState<OrdenVenta | null>(null);
+  const [activeTimeline, setActiveTimeline] = useState<OrdenVenta | null>(null);
+  const [showTimeline,   setShowTimeline]   = useState(false);
+
+  const [filtroCampana,   setFiltroCampana]   = useState('');
+  const [filtroProductor, setFiltroProductor] = useState('');
+  const [filtroFecha,     setFiltroFecha]     = useState('');
+  const [filtroLote,      setFiltroLote]      = useState('');
+
+  const displayed = useMemo(() => {
+    return ordenes.filter(o => {
+      if (filtroCampana   && o.campana   !== filtroCampana)                                   return false;
+      if (filtroProductor && o.productor !== filtroProductor)                                 return false;
+      if (filtroLote      && !o.lote.toLowerCase().includes(filtroLote.toLowerCase()))        return false;
+      return true;
+    });
+  }, [ordenes, filtroCampana, filtroProductor, filtroLote]);
+
+  function handleBuscar() {
+    setLoading(true);
+    setTimeout(() => setLoading(false), 350);
+  }
+
+  function handleSave(data: Partial<OrdenVenta>) {
+    if (modal === 'edit' && selected) {
+      setOrdenes(prev => prev.map(o => o.id === selected.id ? { ...o, ...data } : o));
+      if (activeTimeline?.id === selected.id) setActiveTimeline(o => o ? { ...o, ...data } : o);
+    } else {
+      const nueva: OrdenVenta = {
+        id:           `ORD-2026-${String(ordenes.length + 1).padStart(3, '0')}`,
+        cliente:      data.cliente      ?? '',
+        productor:    data.productor    ?? '',
+        campana:      data.campana      ?? '',
+        fecha:        data.fecha        ?? '',
+        estado:       data.estado       ?? 'pre_venta',
+        lote:         data.lote         ?? '',
+        cantidadKg:   data.cantidadKg   ?? 0,
+        destino:      data.destino      ?? '',
+        tipoProducto: data.tipoProducto ?? '',
+        montoUSD:     data.montoUSD     ?? 0,
+      };
+      TIMELINES[nueva.id] = buildTimeline(0);
+      setOrdenes(prev => [nueva, ...prev]);
+      setActiveTimeline(nueva);
+    }
+  }
+
+  function handleDelete() {
+    if (!selected) return;
+    setOrdenes(prev => prev.filter(o => o.id !== selected.id));
+    if (activeTimeline?.id === selected.id) setActiveTimeline(null);
+    setModal(null);
+    setSelected(null);
+  }
+
+  
+  const totalKg  = ordenes.reduce((s, o) => s + o.cantidadKg, 0);
+  const totalUSD = ordenes.reduce((s, o) => s + o.montoUSD, 0);
+  const counts   = Object.fromEntries(
+    (Object.keys(ESTADO_CFG) as EstadoOrden[]).map(k => [k, ordenes.filter(o => o.estado === k).length])
+  ) as Record<EstadoOrden, number>;
+
+  return (
+    <div className="min-h-full flex flex-col" style={{ backgroundColor: BG }}>
+
+      
+      <div className="bg-white border-b px-4 md:px-8 pt-6 pb-5" style={{ borderColor: BD }}>
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: CP }}>
+              <Package size={22} className="text-white" />
+            </div>
+            <div>
+              <h1 className="font-headline text-2xl sm:text-3xl font-black uppercase tracking-widest leading-none" style={{ color: TX }}>
+                Gestión de Operaciones
+              </h1>
+              <p className="text-xs text-gray-400 mt-1 font-medium">Control de órdenes de venta y seguimiento de exportación</p>
+            </div>
+          </div>
+
+          
+          <div className="flex flex-wrap gap-2">
+            <StatChip label="Total órdenes" value={ordenes.length} icon={<FileText size={15} style={{ color: CP }} />} />
+            <StatChip label="En exportación" value={counts.exportacion} icon={<Ship size={15} style={{ color: '#7c3aed' }} />} accent="#f5f3ff" />
+            <StatChip label="Total KG" value={`${(totalKg / 1000).toFixed(1)} t`} icon={<Weight size={15} style={{ color: CS }} />} />
+            <StatChip label="Monto USD" value={`$${(totalUSD / 1000).toFixed(0)}k`} icon={<TrendingUp size={15} style={{ color: '#059669' }} />} accent="#ecfdf5" />
+          </div>
+        </div>
+
+        
+        <div className="flex flex-wrap gap-2 mt-4">
+          {(Object.entries(ESTADO_CFG) as [EstadoOrden, typeof ESTADO_CFG[EstadoOrden]][]).map(([k, v]) => (
+            <div key={k} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[0.65rem] font-bold border ${v.badge}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${v.dot}`} />
+              {v.label}: <span className="font-black ml-0.5">{counts[k]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      
+      <FilterBar
+        campana={filtroCampana}     setCampana={setFiltroCampana}
+        productor={filtroProductor} setProductor={setFiltroProductor}
+        fecha={filtroFecha}         setFecha={setFiltroFecha}
+        lote={filtroLote}           setLote={setFiltroLote}
+        onBuscar={handleBuscar}
+        onNueva={() => { setSelected(null); setModal('create'); }}
+      />
+
+      
+      <div className="flex-1 px-4 md:px-8 py-6 space-y-6">
+
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {loading
+            ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+            : displayed.length === 0
+              ? <EmptyState onNueva={() => { setSelected(null); setModal('create'); }} />
+              : displayed.map(o => (
+                  <OrderCard
+                    key={o.id}
+                    orden={o}
+                    active={activeTimeline?.id === o.id}
+                    onSelect={() => { setActiveTimeline(o); setShowTimeline(true); }}
+                    onEdit={() => { setSelected(o); setModal('edit'); }}
+                    onDelete={() => { setSelected(o); setModal('delete'); }}
+                    onFlow={(type) => { setSelected(o); setModal(type); }}
+                  />
+                ))
+          }
+        </div>
+
+      </div>
+
+      
+      {(modal === 'create' || modal === 'edit') && (
+        <OrderModal
+          initial={modal === 'edit' ? selected : null}
+          onClose={() => { setModal(null); setSelected(null); }}
+          onSave={handleSave}
+        />
+      )}
+      {modal === 'delete' && selected && (
+        <DeleteConfirm
+          orden={selected}
+          onClose={() => { setModal(null); setSelected(null); }}
+          onConfirm={handleDelete}
+        />
+      )}
+
+      
+      {(() => {
+        
+        const goToModalStep = (step: StepKey) => {
+          const map: Partial<Record<StepKey, FlowModal>> = {
+            envio_muestra:    'preventa',
+            envio_cotizacion: 'cotizacion',
+            compromiso_venta: 'compromiso',
+            asignacion_lotes: 'asignacion_lotes',
+            despacho:         'despacho',
+          };
+          const next = map[step];
+          if (next) setModal(next);
+        };
+        const closeFlow = () => { setModal(null); setSelected(null); };
+        const ord = selected;
+        if (!ord) return null;
+        return (<>
+          {modal === 'preventa'         && <PreventaEnvioMuestrasModal   orden={ord} onClose={closeFlow} onGoToStep={goToModalStep} />}
+          {modal === 'cotizacion'       && <PreventaEnvioCotizacionModal orden={ord} onClose={closeFlow} onGoToStep={goToModalStep} />}
+          {modal === 'compromiso'       && <AlistadoCompromisoVentaModal orden={ord} onClose={closeFlow} onGoToStep={goToModalStep} />}
+          {modal === 'asignacion_lotes' && <AlistadoAsignacionLotesModal orden={ord} onClose={closeFlow} onGoToStep={goToModalStep} />}
+          {modal === 'despacho'         && <AlistadoDespachoModal        orden={ord} onClose={closeFlow} onGoToStep={goToModalStep} />}
+        </>);
+      })()}
+
+      
+      {showTimeline && activeTimeline && (
+        <ProcessTimelineModal
+          orden={activeTimeline}
+          onClose={() => setShowTimeline(false)}
+        />
+      )}
+    </div>
+  );
+}

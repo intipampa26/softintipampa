@@ -1,0 +1,54 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+# Images (except public assets needed by the app)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.ico
+!frontend/public/*.png
+!frontend/public/*.jpg
+!frontend/public/*.ico
+
+# Documents
+*.pdf
+*.xlsx
+*.xls
+*.csv
+*.docx
+*.doc
+
+# Keys & secrets
+*.pem
+*.key
+*.cert
+*.crt
+
+# Markdown
+*.md
+
+# Docs folder
+docs/
+
+# Claude
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build output
+frontend/dist/
+backend/dist/
+
+# Uploads
+uploads/

@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply font-sans text-gray-900 bg-gray-50;
+    margin: 0;
+  }
+}
+
+/* ── Sidebar nav hover — iluminar icono y texto al pasar ─────────────── */
+@layer components {
+  .nav-item {
+    @apply flex items-center gap-4 px-3 py-3 rounded-xl relative;
+    transition: background-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .nav-item:not(.nav-item--active):hover {
+    background-color: rgba(255, 255, 255, 0.09);
+  }
+  .nav-item:not(.nav-item--active):hover .nav-icon,
+  .nav-item:not(.nav-item--active):hover .nav-label {
+    color: #ffffff !important;
+    opacity: 1 !important;
+  }
+  .nav-item--active {
+    background-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 1px 6px rgba(0,0,0,0.18);
+  }
+  .nav-icon  { transition: color 0.18s ease, opacity 0.18s ease; }
+  .nav-label { transition: color 0.18s ease, opacity 0.18s ease; }
+}
+
+@layer utilities {
+  .bg-forest-dark  { background-color: #1A2B23; }
+  .bg-forest       { background-color: #283F34; }
+  .bg-forest-light { background-color: #3A5C4A; }
+  .text-forest     { color: #283F34; }
+  .text-forest-dark { color: #1A2B23; }
+  .border-forest   { border-color: #283F34; }
+  .ring-forest     { --tw-ring-color: #283F34; }
+}
