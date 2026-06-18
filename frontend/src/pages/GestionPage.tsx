@@ -1,16 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Search, Plus, Pencil, Trash2, Package, Ship, FileText,
-  CheckCircle2, ChevronRight, X, Calendar, User, Hash,
+  ChevronRight, X, Calendar, User, Hash,
   Clock, CheckCheck, Circle, Filter, BarChart3, TrendingUp,
-  MapPin, Weight, Send, Truck,
+  MapPin, Weight,
 } from 'lucide-react';
-import { PreventaEnvioMuestrasModal }   from '../components/PreventaEnvioMuestrasModal';
-import { PreventaEnvioCotizacionModal } from '../components/PreventaEnvioCotizacionModal';
-import { AlistadoCompromisoVentaModal } from '../components/AlistadoCompromisoVentaModal';
-import { AlistadoAsignacionLotesModal } from '../components/AlistadoAsignacionLotesModal';
-import { AlistadoDespachoModal }        from '../components/AlistadoDespachoModal';
-import { StepKey }                      from '@/contexts/FlowContext';
+import { PreventaModal }        from '../components/PreventaModal';
+import { AlistadoModal }        from '../components/AlistadoModal';
+import { ExportacionModal } from '../components/ExportacionModal';
+import { PostVentaModal }  from '../components/PostVentaModal';
+import { clientesService, Cliente }     from '../services/clientes.service';
+import { lotesFinalesService, LoteFinal } from '../services/lotes-finales.service';
 
 const CP  = '#445D46';
 const CS  = '#5F7A61';
@@ -50,6 +50,62 @@ const ESTADO_CFG: Record<EstadoOrden, { label: string; badge: string; dot: strin
   exportacion: { label: 'Exportación', badge: 'bg-violet-50 text-violet-700 border-violet-200',  dot: 'bg-violet-400' },
   post_venta:  { label: 'Post Venta',  badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-400' },
 };
+
+const FLOW_STEPS: { key: EstadoOrden; label: string; short: string }[] = [
+  { key: 'pre_venta',   label: 'Pre Venta',   short: 'Preventa'   },
+  { key: 'alistado',    label: 'Alistado',    short: 'Alistado'   },
+  { key: 'exportacion', label: 'Exportación', short: 'Exportac.'  },
+  { key: 'post_venta',  label: 'Post Venta',  short: 'Post Venta' },
+];
+
+function FlowProgress({ estado, onStageClick }: { estado: EstadoOrden; onStageClick?: (stage: EstadoOrden) => void }) {
+  const activeIdx = FLOW_STEPS.findIndex(s => s.key === estado);
+  return (
+    <div className="px-4 py-3 border-t" style={{ borderColor: BG }}>
+      <div className="flex items-center">
+        {FLOW_STEPS.map((step, i) => {
+          const done    = i < activeIdx;
+          const active  = i === activeIdx;
+          const pending = i > activeIdx;
+          const clickable = true;
+          return (
+            <div key={step.key} className="flex items-center flex-1 min-w-0">
+              <div className="flex flex-col items-center flex-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); if (clickable) onStageClick?.(step.key); }}
+                  className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-all ${clickable ? 'hover:scale-125 cursor-pointer' : 'cursor-default'}`}
+                  style={{
+                    backgroundColor: done ? CP : active ? CP : '#E5E7EB',
+                    border:     active ? `2px solid ${CP}` : done ? 'none' : '2px solid #D1D5DB',
+                    boxShadow:  active ? `0 0 0 3px ${CP}25` : 'none',
+                  }}
+                  title={clickable ? `Ver ${step.label}` : undefined}
+                >
+                  {done && (
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                      <path d="M1.5 4L3 5.5L6.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                  {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                </button>
+                <span
+                  className="text-[0.5rem] font-semibold mt-1 text-center leading-tight truncate w-full"
+                  style={{ color: pending ? '#9CA3AF' : CP }}
+                >
+                  {step.short}
+                </span>
+              </div>
+              {i < FLOW_STEPS.length - 1 && (
+                <div className="h-px flex-1 mx-0.5 mb-3" style={{ backgroundColor: done ? CP : '#E5E7EB' }} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const PASOS = [
   'Registrado', 'Por subir documento', 'Recepcionado',
@@ -130,7 +186,7 @@ function StatusBadge({ estado }: { estado: EstadoOrden }) {
   );
 }
 
-type FlowModal = 'preventa' | 'cotizacion' | 'compromiso' | 'asignacion_lotes' | 'despacho';
+type StageKey = 'preventa' | 'alistado' | 'exportacion' | 'post_venta';
 
 interface CardProps {
   orden: OrdenVenta;
@@ -138,10 +194,11 @@ interface CardProps {
   onSelect: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onFlow: (type: FlowModal) => void;
+  onFlow: (stage: StageKey, tab?: string) => void;
+  onStageClick: (stage: EstadoOrden) => void;
 }
 
-function OrderCard({ orden, active, onSelect, onEdit, onDelete, onFlow }: CardProps) {
+function OrderCard({ orden, active, onSelect, onEdit, onDelete, onFlow, onStageClick }: CardProps) {
   return (
     <div
       onClick={onSelect}
@@ -204,7 +261,8 @@ function OrderCard({ orden, active, onSelect, onEdit, onDelete, onFlow }: CardPr
         </div>
       </div>
 
-      
+      <FlowProgress estado={orden.estado} onStageClick={onStageClick} />
+
       <div className="px-4 py-2.5 border-t flex items-center justify-between" style={{ borderColor: BG, backgroundColor: BG }}>
         <button
           onClick={(e) => { e.stopPropagation(); onSelect(); }}
@@ -214,41 +272,6 @@ function OrderCard({ orden, active, onSelect, onEdit, onDelete, onFlow }: CardPr
           Ver timeline <ChevronRight size={9} />
         </button>
         <div className="flex items-center gap-1">
-
-          {orden.estado === 'pre_venta' && (<>
-            <button onClick={(e) => { e.stopPropagation(); onFlow('preventa'); }}
-              className="h-7 px-2 rounded-lg flex items-center gap-1 text-[0.58rem] font-bold transition-all hover:opacity-85"
-              style={{ backgroundColor: CP, color: '#fff' }} title="Envío de Muestras">
-              <Send size={9} /> Muestras
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); onFlow('cotizacion'); }}
-              className="h-7 px-2 rounded-lg flex items-center gap-1 text-[0.58rem] font-bold transition-all hover:opacity-85"
-              style={{ backgroundColor: CS, color: '#fff' }} title="Envío de Cotización">
-              <FileText size={9} /> Cotiz.
-            </button>
-          </>)}
-
-          {orden.estado === 'alistado' && (<>
-            <button onClick={(e) => { e.stopPropagation(); onFlow('compromiso'); }}
-              className="h-7 px-2 rounded-lg flex items-center gap-1 text-[0.58rem] font-bold transition-all hover:opacity-85"
-              style={{ backgroundColor: CP, color: '#fff' }} title="Compromiso de Venta">
-              <CheckCircle2 size={9} /> Compromi.
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); onFlow('asignacion_lotes'); }}
-              className="h-7 px-2 rounded-lg flex items-center gap-1 text-[0.58rem] font-bold transition-all hover:opacity-85"
-              style={{ backgroundColor: CS, color: '#fff' }} title="Asignación de Lotes">
-              <Package size={9} /> Lotes
-            </button>
-          </>)}
-
-          {orden.estado === 'exportacion' && (
-            <button onClick={(e) => { e.stopPropagation(); onFlow('despacho'); }}
-              className="h-7 px-2 rounded-lg flex items-center gap-1 text-[0.58rem] font-bold transition-all hover:opacity-85"
-              style={{ backgroundColor: CP, color: '#fff' }} title="Alistado y Despacho">
-              <Truck size={9} /> Despacho
-            </button>
-          )}
-
           <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
             className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:scale-105"
             style={{ backgroundColor: '#e8f5e9', color: CP }} title="Editar">
@@ -467,12 +490,23 @@ function OrderModal({ initial, onClose, onSave }: ModalProps) {
     montoUSD:     initial?.montoUSD     ?? 0,
     estado:       (initial?.estado      ?? 'pre_venta') as EstadoOrden,
   });
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [lotes,    setLotes]    = useState<LoteFinal[]>([]);
+  const [moneda,   setMoneda]   = useState<'USD' | 'PEN'>('USD');
+
+  useEffect(() => {
+    clientesService.getPage(1, 200).then(r => setClientes(r.data));
+    lotesFinalesService.getPage({ limit: 200 } as never).then(r => setLotes(r.data));
+  }, []);
 
   const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(f => ({ ...f, [k]: v }));
 
-  const field = (label: string, children: React.ReactNode) => (
+  const field = (label: string, children: React.ReactNode, labelExtra?: React.ReactNode) => (
     <div>
-      <label className="block text-[0.65rem] font-bold uppercase tracking-wide mb-1.5" style={{ color: TX, opacity: 0.6 }}>{label}</label>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="block text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: TX, opacity: 0.6 }}>{label}</label>
+        {labelExtra}
+      </div>
       {children}
     </div>
   );
@@ -498,7 +532,12 @@ function OrderModal({ initial, onClose, onSave }: ModalProps) {
         
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {field('Cliente', <input value={form.cliente} onChange={e => set('cliente', e.target.value)} className={inputCls} style={inpStyle} placeholder="Nombre del cliente…" />)}
+            {field('Cliente', (
+              <select value={form.cliente} onChange={e => set('cliente', e.target.value)} className={inputCls} style={inpStyle}>
+                <option value="">Seleccionar…</option>
+                {clientes.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+              </select>
+            ))}
             {field('Productor', (
               <select value={form.productor} onChange={e => set('productor', e.target.value)} className={inputCls} style={inpStyle}>
                 <option value="">Seleccionar…</option>
@@ -512,10 +551,27 @@ function OrderModal({ initial, onClose, onSave }: ModalProps) {
               </select>
             ))}
             {field('Fecha', <input type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} className={inputCls} style={inpStyle} />)}
-            {field('Lote', <input value={form.lote} onChange={e => set('lote', e.target.value)} className={inputCls} style={inpStyle} placeholder="LF-2026-…" />)}
+            {field('Lote', (
+              <select value={form.lote} onChange={e => set('lote', e.target.value)} className={inputCls} style={inpStyle}>
+                <option value="">Seleccionar…</option>
+                {lotes.map(l => <option key={l.id} value={l.codigo}>{l.codigo}</option>)}
+              </select>
+            ))}
             {field('Tipo de producto', <input value={form.tipoProducto} onChange={e => set('tipoProducto', e.target.value)} className={inputCls} style={inpStyle} placeholder="Café verde, Cacao…" />)}
             {field('Cantidad (kg)', <input type="number" min={0} value={form.cantidadKg} onChange={e => set('cantidadKg', Number(e.target.value))} className={inputCls} style={inpStyle} />)}
-            {field('Monto (USD)', <input type="number" min={0} value={form.montoUSD} onChange={e => set('montoUSD', Number(e.target.value))} className={inputCls} style={inpStyle} />)}
+            {field('Monto', (
+              <input type="number" min={0} value={form.montoUSD} onChange={e => set('montoUSD', Number(e.target.value))} className={inputCls} style={inpStyle} />
+            ), (
+              <div className="flex rounded-lg overflow-hidden border text-[0.6rem] font-bold" style={{ borderColor: BD }}>
+                {(['USD', 'PEN'] as const).map(m => (
+                  <button key={m} type="button" onClick={() => setMoneda(m)}
+                    className="px-2 py-0.5 transition-colors"
+                    style={{ backgroundColor: moneda === m ? CP : 'transparent', color: moneda === m ? '#fff' : TX }}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            ))}
             {field('Destino', <input value={form.destino} onChange={e => set('destino', e.target.value)} className={inputCls} style={inpStyle} placeholder="País destino…" />)}
             {field('Estado', (
               <select value={form.estado} onChange={e => set('estado', e.target.value as EstadoOrden)} className={inputCls} style={inpStyle}>
@@ -640,12 +696,13 @@ function FilterBar({ campana, setCampana, productor, setProductor, fecha, setFec
   );
 }
 
-type ModalType = 'create' | 'edit' | 'delete' | FlowModal | null;
+type ModalType = 'create' | 'edit' | 'delete' | StageKey | null;
 
 export function GestionPage() {
   const [ordenes,        setOrdenes]        = useState<OrdenVenta[]>(ORDENES_INIT);
   const [loading,        setLoading]        = useState(false);
   const [modal,          setModal]          = useState<ModalType>(null);
+  const [flowTab,        setFlowTab]        = useState<string | undefined>(undefined);
   const [selected,       setSelected]       = useState<OrdenVenta | null>(null);
   const [activeTimeline, setActiveTimeline] = useState<OrdenVenta | null>(null);
   const [showTimeline,   setShowTimeline]   = useState(false);
@@ -654,8 +711,12 @@ export function GestionPage() {
   const [filtroProductor, setFiltroProductor] = useState('');
   const [filtroFecha,     setFiltroFecha]     = useState('');
   const [filtroLote,      setFiltroLote]      = useState('');
+  const [page,            setPage]            = useState(1);
+
+  const ITEMS_PER_PAGE = 6;
 
   const displayed = useMemo(() => {
+    setPage(1);
     return ordenes.filter(o => {
       if (filtroCampana   && o.campana   !== filtroCampana)                                   return false;
       if (filtroProductor && o.productor !== filtroProductor)                                 return false;
@@ -664,8 +725,12 @@ export function GestionPage() {
     });
   }, [ordenes, filtroCampana, filtroProductor, filtroLote]);
 
+  const totalPages = Math.max(1, Math.ceil(displayed.length / ITEMS_PER_PAGE));
+  const paginated  = displayed.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
   function handleBuscar() {
     setLoading(true);
+    setPage(1);
     setTimeout(() => setLoading(false), 350);
   }
 
@@ -766,7 +831,7 @@ export function GestionPage() {
             ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
             : displayed.length === 0
               ? <EmptyState onNueva={() => { setSelected(null); setModal('create'); }} />
-              : displayed.map(o => (
+              : paginated.map(o => (
                   <OrderCard
                     key={o.id}
                     orden={o}
@@ -774,11 +839,60 @@ export function GestionPage() {
                     onSelect={() => { setActiveTimeline(o); setShowTimeline(true); }}
                     onEdit={() => { setSelected(o); setModal('edit'); }}
                     onDelete={() => { setSelected(o); setModal('delete'); }}
-                    onFlow={(type) => { setSelected(o); setModal(type); }}
+                    onFlow={(stage, tab) => { setSelected(o); setFlowTab(tab); setModal(stage); }}
+                    onStageClick={(stage) => {
+                      setSelected(o);
+                      const stageMap: Partial<Record<EstadoOrden, StageKey>> = {
+                        pre_venta:   'preventa',
+                        alistado:    'alistado',
+                        exportacion: 'exportacion',
+                        post_venta:  'post_venta',
+                      };
+                      const s = stageMap[stage];
+                      if (s) { setFlowTab(undefined); setModal(s); }
+                    }}
                   />
                 ))
           }
         </div>
+
+        {!loading && displayed.length > ITEMS_PER_PAGE && (
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="w-8 h-8 rounded-xl border flex items-center justify-center text-sm font-bold transition-all disabled:opacity-30 hover:bg-white"
+              style={{ borderColor: BD, color: TX }}
+            >
+              ‹
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+              <button
+                key={n}
+                onClick={() => setPage(n)}
+                className="w-8 h-8 rounded-xl border text-[0.72rem] font-black transition-all"
+                style={{
+                  borderColor:     n === page ? CP : BD,
+                  backgroundColor: n === page ? CP : 'transparent',
+                  color:           n === page ? '#fff' : TX,
+                }}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="w-8 h-8 rounded-xl border flex items-center justify-center text-sm font-bold transition-all disabled:opacity-30 hover:bg-white"
+              style={{ borderColor: BD, color: TX }}
+            >
+              ›
+            </button>
+            <span className="text-[0.62rem] text-gray-400 ml-1">
+              {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, displayed.length)} de {displayed.length}
+            </span>
+          </div>
+        )}
 
       </div>
 
@@ -799,30 +913,34 @@ export function GestionPage() {
       )}
 
       
-      {(() => {
-        
-        const goToModalStep = (step: StepKey) => {
-          const map: Partial<Record<StepKey, FlowModal>> = {
-            envio_muestra:    'preventa',
-            envio_cotizacion: 'cotizacion',
-            compromiso_venta: 'compromiso',
-            asignacion_lotes: 'asignacion_lotes',
-            despacho:         'despacho',
-          };
-          const next = map[step];
-          if (next) setModal(next);
-        };
-        const closeFlow = () => { setModal(null); setSelected(null); };
-        const ord = selected;
-        if (!ord) return null;
-        return (<>
-          {modal === 'preventa'         && <PreventaEnvioMuestrasModal   orden={ord} onClose={closeFlow} onGoToStep={goToModalStep} />}
-          {modal === 'cotizacion'       && <PreventaEnvioCotizacionModal orden={ord} onClose={closeFlow} onGoToStep={goToModalStep} />}
-          {modal === 'compromiso'       && <AlistadoCompromisoVentaModal orden={ord} onClose={closeFlow} onGoToStep={goToModalStep} />}
-          {modal === 'asignacion_lotes' && <AlistadoAsignacionLotesModal orden={ord} onClose={closeFlow} onGoToStep={goToModalStep} />}
-          {modal === 'despacho'         && <AlistadoDespachoModal        orden={ord} onClose={closeFlow} onGoToStep={goToModalStep} />}
-        </>);
-      })()}
+      {selected && modal === 'preventa'   && (
+        <PreventaModal
+          orden={selected}
+          initialTab={(flowTab as 'muestras' | 'cotizacion') ?? 'muestras'}
+          onClose={() => { setModal(null); setSelected(null); setFlowTab(undefined); }}
+        />
+      )}
+      {selected && modal === 'alistado'   && (
+        <AlistadoModal
+          orden={selected}
+          initialTab={(flowTab as 'compromiso' | 'lotes') ?? 'compromiso'}
+          onClose={() => { setModal(null); setSelected(null); setFlowTab(undefined); }}
+        />
+      )}
+      {selected && modal === 'exportacion' && (
+        <ExportacionModal
+          orden={selected}
+          initialTab={(flowTab as 'aduanero' | 'datos_cliente' | 'plan') ?? 'aduanero'}
+          onClose={() => { setModal(null); setSelected(null); setFlowTab(undefined); }}
+        />
+      )}
+      {selected && modal === 'post_venta' && (
+        <PostVentaModal
+          orden={selected}
+          initialTab={(flowTab as 'cierre' | 'feedback' | 'reclamos') ?? 'cierre'}
+          onClose={() => { setModal(null); setSelected(null); setFlowTab(undefined); }}
+        />
+      )}
 
       
       {showTimeline && activeTimeline && (

@@ -63,8 +63,7 @@ export function AlistadoDespachoModal({ orden, onClose, onGoToStep }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={onClose}                                    className="text-[0.65rem] font-bold px-4 py-2 rounded-xl transition-colors hover:bg-green-400" style={{ backgroundColor: '#86efac', color: '#14532d' }}>GUARDAR</button>
-            <button onClick={() => onGoToStep?.('asignacion_lotes')}     className="text-[0.65rem] font-bold px-4 py-2 rounded-xl text-white bg-pink-500 hover:bg-pink-600 transition-colors">CANCELAR</button>
+            <button onClick={onClose} className="text-[0.65rem] font-bold px-4 py-2 rounded-xl text-white transition-opacity hover:opacity-90" style={{ backgroundColor: CP }}>GUARDAR</button>
             <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-black/06 transition-all ml-1"><X size={16} /></button>
           </div>
         </div>
