@@ -11,6 +11,8 @@ import { FilterMuestrasDto } from './dto/filter-muestras.dto';
 import { BatchSyncDto, OperacionSync } from './dto/batch-sync.dto';
 import { PaginatedResult } from '../common/interfaces/api-response.interface';
 import { paginate } from '../common/helpers/pagination.helper';
+import { KardexService } from '../kardex/kardex.service';
+import { TipoMovimientoKardex, ReferenciaTipoKardex } from '../kardex/movimiento-kardex.entity';
 
 export type EstadoSync = 'OK' | 'CONFLICTO' | 'ERROR';
 
@@ -55,6 +57,7 @@ export class MuestrasService {
     private readonly fisicaRepo: Repository<EvaluacionFisica>,
     @InjectRepository(EvaluacionSensorial)
     private readonly sensorialRepo: Repository<EvaluacionSensorial>,
+    private readonly kardexService: KardexService,
   ) {}
 
   
@@ -113,7 +116,7 @@ export class MuestrasService {
     return `M-${year}-0001`;
   }
 
-   
+
   async create(dto: CreateMuestraDto): Promise<Muestra> {
     if (dto.clientId) {
       const existing = await this.repo.findOne({
@@ -124,7 +127,22 @@ export class MuestrasService {
     }
     const codigo  = await this.generateCodigo();
     const muestra = this.repo.create({ ...dto, codigo });
-    return this.repo.save(muestra);
+    const saved   = await this.repo.save(muestra);
+
+    if (saved.loteFinalId && saved.cantidadKg) {
+      const fecha = saved.fechaRegistro ?? new Date().toISOString().slice(0, 10);
+      await this.kardexService.registrar({
+        loteFinalId:    saved.loteFinalId,
+        tipoMovimiento: TipoMovimientoKardex.SALIDA,
+        cantidadKg:     Number(saved.cantidadKg),
+        referenciaTipo: ReferenciaTipoKardex.MUESTRA,
+        referenciaId:   saved.id,
+        fecha,
+        observaciones:  `Envío de muestra ${saved.codigo}`,
+      });
+    }
+
+    return saved;
   }
 
   async update(id: number, dto: UpdateMuestraDto): Promise<Muestra> {
@@ -134,8 +152,21 @@ export class MuestrasService {
   }
 
   async remove(id: number): Promise<void> {
-    await this.findOne(id);
+    const muestra = await this.findOne(id);
     await this.repo.update(id, { activo: false });
+
+    if (muestra.loteFinalId && muestra.cantidadKg) {
+      const fecha = muestra.fechaRegistro ?? new Date().toISOString().slice(0, 10);
+      await this.kardexService.registrar({
+        loteFinalId:    muestra.loteFinalId,
+        tipoMovimiento: TipoMovimientoKardex.INGRESO,
+        cantidadKg:     Number(muestra.cantidadKg),
+        referenciaTipo: ReferenciaTipoKardex.MUESTRA,
+        referenciaId:   muestra.id,
+        fecha,
+        observaciones:  `Reversa eliminación muestra ${muestra.codigo}`,
+      });
+    }
   }
 
   

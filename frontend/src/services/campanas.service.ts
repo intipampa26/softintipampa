@@ -18,7 +18,7 @@ export type CreateCampanaDto = Omit<Campana, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateCampanaDto = Partial<CreateCampanaDto>;
 
 const CACHE_KEY = 'collective_bean_campanas_cache';
-const BASE = '/api/campanas';
+const BASE = '/campanas';
 
 function readCache(): Campana[] {
   try {

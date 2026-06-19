@@ -8,4 +8,5 @@ export class FilterLotesFinalesDto extends PaginationDto {
   @IsInt() @Min(1) @IsOptional() @Type(() => Number) tipoProductoId?: number;
   @IsInt() @Min(1) @IsOptional() @Type(() => Number) campanaId?: number;
   @IsInt() @Min(1) @IsOptional() @Type(() => Number) loteOrigenId?: number;
+  @IsInt() @Min(1) @IsOptional() @Type(() => Number) productorId?: number;
 }

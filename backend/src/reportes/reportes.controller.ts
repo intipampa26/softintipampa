@@ -48,4 +48,19 @@ export class ReportesController {
     res.setHeader('Content-Disposition', 'attachment; filename="lotes-finales.xlsx"');
     res.send(buffer);
   }
+
+  @Get('acopio/resumen')
+  getAcopioResumen() {
+    return this.service.getAcopioResumen();
+  }
+
+  @Get('trilla/resumen')
+  getTrillaResumen() {
+    return this.service.getTrillaResumen();
+  }
+
+  @Get('ventas/resumen')
+  getVentasResumen() {
+    return this.service.getVentasResumen();
+  }
 }

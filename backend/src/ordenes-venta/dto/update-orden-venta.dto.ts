@@ -1,4 +1,35 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateOrdenVentaDto } from './create-orden-venta.dto';
+import { IsString, IsOptional, IsNumber, IsDateString, IsEnum, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { EtapaOrden } from '../orden-venta.entity';
 
-export class UpdateOrdenVentaDto extends PartialType(CreateOrdenVentaDto) {}
+export class UpdateOrdenVentaDto {
+  @IsOptional() @IsString()
+  cliente?: string;
+
+  @IsOptional() @IsString()
+  productor?: string;
+
+  @IsOptional() @IsString()
+  campana?: string;
+
+  @IsOptional() @IsString()
+  lote?: string;
+
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0)
+  cantidadKg?: number;
+
+  @IsOptional() @IsString()
+  destino?: string;
+
+  @IsOptional() @IsString()
+  tipoProducto?: string;
+
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(0)
+  montoUSD?: number;
+
+  @IsOptional() @IsDateString()
+  fecha?: string;
+
+  @IsOptional() @IsEnum(EtapaOrden)
+  etapaActual?: EtapaOrden;
+}

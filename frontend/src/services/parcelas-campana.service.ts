@@ -61,7 +61,7 @@ export interface ParcelaCampana {
 
 export type UpsertParcelaCampanaDto = Omit<ParcelaCampana, 'id' | 'campana' | 'createdAt' | 'updatedAt'>;
 
-const BASE = '/api/parcelas-campana';
+const BASE = '/parcelas-campana';
 
 export const parcelasCampanaService = {
    

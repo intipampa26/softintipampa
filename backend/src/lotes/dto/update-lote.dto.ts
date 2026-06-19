@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { LoteEstado } from '../lote.entity';
 
@@ -12,6 +12,15 @@ export class UpdateLoteDto {
   @IsOptional()
   @Type(() => Number)
   cantidadKg?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  cantidadSacos?: number;
+
+  @IsDateString()
+  @IsOptional()
+  fechaAdquisicion?: string;
 
   @IsString()
   @IsOptional()

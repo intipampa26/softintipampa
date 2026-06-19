@@ -78,7 +78,7 @@ function writeCache(productorId: number, data: FamiliarProductor[]) {
 }
 
 function base(productorId: number) {
-  return `/api/productores/${productorId}/familiares`;
+  return `/productores/${productorId}/familiares`;
 }
 
 export const familiaresService = {

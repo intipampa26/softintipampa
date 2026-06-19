@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { muestrasService, type Muestra } from '@/services/muestras.service';
 
+const VARIEDADES_CAFE = ['Caturra','Borbón Rojo','Borbon naranja','Gesha','Pacamara','Tabi','Sidra','Papayo','Blend','Pache','Costa Rica 95','Tipica','Catimor','Maragogipe','SL34','Villa Sarchí','Marsellesa','Limani'];
+
 interface SampleState {
   numero:           string;
   nivelTueste:      number;
@@ -270,12 +272,14 @@ export function EvaluacionSensorialCafeContent({ muestra, formId, onSaved, onSav
             ))}
             <label className="flex items-center gap-1">
               <span className="text-[0.6rem] font-bold text-gray-700 whitespace-nowrap">Variedad:</span>
-              <input
+              <select
                 value={variedad}
                 onChange={e => setVariedad(e.target.value)}
                 className="border-b border-gray-600 text-[0.65rem] bg-transparent focus:outline-none px-0.5 min-w-[80px]"
-                placeholder="—"
-              />
+              >
+                <option value="">—</option>
+                {VARIEDADES_CAFE.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
             </label>
           </div>
         </div>

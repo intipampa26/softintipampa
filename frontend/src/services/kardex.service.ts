@@ -48,7 +48,7 @@ export interface PagedKardex {
 }
 
 const CACHE_KEY = 'intipampa_kardex_cache';
-const BASE = '/api/kardex';
+const BASE = '/kardex';
 
 function writeCache(data: PagedKardex) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch {}
@@ -75,10 +75,18 @@ export const kardexService = {
 
     if (!navigator.onLine) return readCache();
     try {
-      const res  = await api.get(BASE, { params });
-      const data: MovimientoKardex[] = Array.isArray(res.data) ? res.data : [];
-      const meta = (res as unknown as { meta: PagedKardex['meta'] }).meta
-        ?? { total: 0, page: 1, lastPage: 1, limit: 20 };
+      const res = await api.get(BASE, { params });
+      const raw = res.data;
+      let data: MovimientoKardex[];
+      let meta: PagedKardex['meta'];
+      if (Array.isArray(raw)) {
+        data = raw as MovimientoKardex[];
+        meta = { total: data.length, page: 1, lastPage: 1, limit: data.length || 20 };
+      } else {
+        const payload = raw as { data?: MovimientoKardex[]; meta?: PagedKardex['meta'] };
+        data = Array.isArray(payload?.data) ? payload.data : [];
+        meta = payload?.meta ?? { total: 0, page: 1, lastPage: 1, limit: 20 };
+      }
       const result: PagedKardex = { data, meta };
       writeCache(result);
       return result;

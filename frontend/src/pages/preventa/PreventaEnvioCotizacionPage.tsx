@@ -32,11 +32,14 @@ export function PreventaEnvioCotizacionPage() {
   const [fechaCotiz,    setFechaCotiz]    = useState('');
   const [validez,       setValidez]       = useState('');
   const [precioUsd,     setPrecioUsd]     = useState('');
+  const [moneda,        setMoneda]        = useState<'USD' | 'PEN'>('USD');
   const [pesoKg,        setPesoKg]        = useState('');
   const [incoterm,      setIncoterm]      = useState('');
   const [puerto,        setPuerto]        = useState('');
   const [condPago,      setCondPago]      = useState('');
   const [observaciones, setObservaciones] = useState('');
+
+  const monedaSymbol = moneda === 'PEN' ? 'S/.' : 'USD';
 
   return (
     <div className="min-h-full flex flex-col" style={{ backgroundColor: BG }}>
@@ -51,17 +54,26 @@ export function PreventaEnvioCotizacionPage() {
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
         <div className="bg-white rounded-2xl border p-5 space-y-4" style={{ borderColor: BD }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {field('N° Cotización',
-              <input value={nroCotizacion} onChange={e => setNroCotizacion(e.target.value)} className={INP} style={inpStyle} placeholder="COT-2026-001" />
-            )}
             {field('Fecha de cotización',
               <div className="relative">
                 <input type="date" value={fechaCotiz} onChange={e => setFechaCotiz(e.target.value)} className={INP} style={inpStyle} />
                 <Calendar size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
             )}
-            {field('Precio (USD / kg)',
-              <input type="number" min={0} step="0.01" value={precioUsd} onChange={e => setPrecioUsd(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+            {field(`Precio (${moneda} / kg)`,
+              <div className="flex gap-2">
+                <div className="flex rounded-xl overflow-hidden border shrink-0" style={{ borderColor: BD }}>
+                  {(['USD', 'PEN'] as const).map(m => (
+                    <button key={m} type="button"
+                      onClick={() => setMoneda(m)}
+                      className="px-3 py-2 text-xs font-bold transition-colors"
+                      style={{ backgroundColor: moneda === m ? CP : '#fff', color: moneda === m ? '#fff' : '#6B7280' }}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                <input type="number" min={0} step="0.01" value={precioUsd} onChange={e => setPrecioUsd(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+              </div>
             )}
             {field('Peso total (kg)',
               <input type="number" min={0} value={pesoKg} onChange={e => setPesoKg(e.target.value)} className={INP} style={inpStyle} placeholder="0" />
@@ -98,12 +110,11 @@ export function PreventaEnvioCotizacionPage() {
             )}
           </div>
 
-          
           {precioUsd && pesoKg && (
             <div className="rounded-xl px-4 py-3 flex items-center gap-3" style={{ backgroundColor: `${CP}12` }}>
               <p className="text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: CP }}>Total estimado:</p>
               <p className="font-black text-base" style={{ color: CP }}>
-                USD {(parseFloat(precioUsd) * parseFloat(pesoKg)).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                {monedaSymbol} {(parseFloat(precioUsd) * parseFloat(pesoKg)).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
               </p>
             </div>
           )}

@@ -29,6 +29,7 @@ export function PreventaEnvioCotizacionModal({ orden, onClose, onGoToStep }: Pro
   const [nroCotizacion, setNroCotizacion] = useState('');
   const [fechaCotiz,    setFechaCotiz]    = useState('');
   const [precioUsd,     setPrecioUsd]     = useState('');
+  const [moneda,        setMoneda]        = useState<'USD' | 'PEN'>('USD');
   const [pesoKg,        setPesoKg]        = useState('');
   const [incoterm,      setIncoterm]      = useState('');
   const [puerto,        setPuerto]        = useState('');
@@ -37,6 +38,7 @@ export function PreventaEnvioCotizacionModal({ orden, onClose, onGoToStep }: Pro
   const [observaciones, setObservaciones] = useState('');
 
   const total = precioUsd && pesoKg ? parseFloat(precioUsd) * parseFloat(pesoKg) : 0;
+  const monedaSymbol = moneda === 'PEN' ? 'S/.' : 'USD';
 
   return (
     <div
@@ -70,10 +72,6 @@ export function PreventaEnvioCotizacionModal({ orden, onClose, onGoToStep }: Pro
         <div className="overflow-y-auto flex-1 px-5 py-5 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              {fieldLabel('N° Cotización')}
-              <input value={nroCotizacion} onChange={e => setNroCotizacion(e.target.value)} className={INP} style={inpStyle} placeholder="COT-2026-001" />
-            </div>
-            <div>
               {fieldLabel('Fecha de cotización')}
               <div className="relative">
                 <input type="date" value={fechaCotiz} onChange={e => setFechaCotiz(e.target.value)} className={INP} style={inpStyle} />
@@ -81,8 +79,20 @@ export function PreventaEnvioCotizacionModal({ orden, onClose, onGoToStep }: Pro
               </div>
             </div>
             <div>
-              {fieldLabel('Precio (USD / kg)')}
-              <input type="number" min={0} step="0.01" value={precioUsd} onChange={e => setPrecioUsd(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+              {fieldLabel(`Precio (${moneda} / kg)`)}
+              <div className="flex gap-2">
+                <div className="flex rounded-xl overflow-hidden border shrink-0" style={{ borderColor: BD }}>
+                  {(['USD', 'PEN'] as const).map(m => (
+                    <button key={m} type="button"
+                      onClick={() => setMoneda(m)}
+                      className="px-3 py-2 text-xs font-bold transition-colors"
+                      style={{ backgroundColor: moneda === m ? CP : '#fff', color: moneda === m ? '#fff' : '#6B7280' }}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                <input type="number" min={0} step="0.01" value={precioUsd} onChange={e => setPrecioUsd(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+              </div>
             </div>
             <div>
               {fieldLabel('Peso total (kg)')}
@@ -127,7 +137,7 @@ export function PreventaEnvioCotizacionModal({ orden, onClose, onGoToStep }: Pro
           {total > 0 && (
             <div className="rounded-xl px-4 py-3 flex items-center gap-3" style={{ backgroundColor: `${CP}12` }}>
               <p className="text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: CP }}>Total estimado:</p>
-              <p className="font-black text-base" style={{ color: CP }}>USD {total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+              <p className="font-black text-base" style={{ color: CP }}>{monedaSymbol} {total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
             </div>
           )}
 

@@ -18,6 +18,8 @@ import {
 const CP = '#1A2B23';
 const CS = '#283F34';
 
+const VARIEDADES_CAFE = ['Caturra','Borbón Rojo','Borbon naranja','Gesha','Pacamara','Tabi','Sidra','Papayo','Blend','Pache','Costa Rica 95','Tipica','Catimor','Maragogipe','SL34','Villa Sarchí','Marsellesa','Limani'];
+
 const TH      = 'border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700 uppercase tracking-wide text-center';
 const TDLABEL = 'border border-gray-200 px-3 py-2 text-xs text-gray-700 font-medium bg-gray-50/70 whitespace-nowrap';
 const TDCELL  = 'border border-gray-200 px-1 py-1 text-sm';
@@ -221,11 +223,10 @@ export function EvaluacionFisicaContent({ muestra, formId, onSaved, onSaveError,
           </div>
           <div>
             <label className={LABEL}>Variedad</label>
-            <input
-              value={variedad}
-              onChange={e => setVariedad(e.target.value)}
-              className={FIELD} placeholder="Ej: Caturra, Geisha…"
-            />
+            <select value={variedad} onChange={e => setVariedad(e.target.value)} className={FIELD}>
+              <option value="">Seleccionar…</option>
+              {VARIEDADES_CAFE.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
           </div>
           <div>
             <label className={LABEL}>Humedad de Grano</label>

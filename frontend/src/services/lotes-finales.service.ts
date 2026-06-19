@@ -90,6 +90,7 @@ export interface FilterLotesFinalesDto {
   tipoProductoId?: number;
   campanaId?: number;
   loteOrigenId?: number;
+  productorId?: number;
 }
 
 export interface PaginationMeta { total: number; page: number; lastPage: number; limit: number; }
@@ -108,7 +109,7 @@ class LotesFinalesService {
   async getPage(filter: FilterLotesFinalesDto = {}): Promise<PagedLotesFinales> {
     if (!navigator.onLine) return readCache();
     try {
-      const res  = await api.get('/api/lotes-finales', { params: filter });
+      const res  = await api.get('/lotes-finales', { params: filter });
       const data: LoteFinal[] = Array.isArray(res.data) ? res.data : [];
       const meta: PaginationMeta = (res as unknown as { meta: PaginationMeta }).meta ?? { total: 0, page: 1, lastPage: 1, limit: 10 };
       const result = { data, meta };
@@ -118,18 +119,22 @@ class LotesFinalesService {
   }
 
   async getDetalle(id: number): Promise<DetalleLoteFinal> {
-    const { data } = await api.get(`/api/lotes-finales/${id}`);
+    const { data } = await api.get(`/lotes-finales/${id}`);
     return data;
   }
 
   async trillar(id: number, dto: TrillarDto): Promise<Trillado> {
-    const { data } = await api.post(`/api/lotes-finales/${id}/trillar`, dto);
+    const { data } = await api.post(`/lotes-finales/${id}/trillar`, dto);
     return data;
   }
 
   async getKardex(id: number): Promise<MovimientoKardex[]> {
-    const { data } = await api.get(`/api/lotes-finales/${id}/kardex`);
-    return Array.isArray(data) ? data : [];
+    try {
+      const { data } = await api.get(`/lotes-finales/${id}/kardex`);
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
   }
 }
 

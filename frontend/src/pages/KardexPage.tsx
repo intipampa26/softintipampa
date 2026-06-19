@@ -39,15 +39,19 @@ function getOrigenes(m: MovimientoKardex): string {
 }
 
 const TIPO_ORIGEN_LABEL: Record<string, string> = {
-  DIRECTO:  'DIRECTO',
-  DIVISION: 'DIVISIÓN',
-  MEZCLA:   'MEZCLA',
+  DIRECTO:          'DIRECTO',
+  DIVISION:         'DIVISIÓN',
+  MEZCLA:           'MEZCLA',
+  MUESTRA:          'Env. Muestra',
+  PREVENTA_MUESTRA: 'Env. Muestra',
 };
 
 const TIPO_ORIGEN_COLOR: Record<string, { bg: string; text: string }> = {
-  DIRECTO:  { bg: '#ECFDF5', text: '#065F46' },
-  DIVISION: { bg: '#EFF6FF', text: '#1E40AF' },
-  MEZCLA:   { bg: '#FFF7ED', text: '#9A3412' },
+  DIRECTO:          { bg: '#ECFDF5', text: '#065F46' },
+  DIVISION:         { bg: '#EFF6FF', text: '#1E40AF' },
+  MEZCLA:           { bg: '#FFF7ED', text: '#9A3412' },
+  MUESTRA:          { bg: '#F5F3FF', text: '#6D28D9' },
+  PREVENTA_MUESTRA: { bg: '#F5F3FF', text: '#6D28D9' },
 };
 
 const MOTIVO_COLOR: Record<TipoMovimientoKardex, string> = {
@@ -283,8 +287,10 @@ export function KardexPage() {
                   const lf      = m.loteFinal;
                   const tp      = lf?.tipoProducto;
                   const origen  = getOrigenes(m);
-                  const tipoOrigen = lf?.tipoOrigen;
-                  const tipoOrigenStyle = tipoOrigen ? TIPO_ORIGEN_COLOR[tipoOrigen] : null;
+                  const tipoOrigenKey = (['MUESTRA', 'PREVENTA_MUESTRA'] as string[]).includes(m.referenciaTipo)
+                    ? m.referenciaTipo
+                    : (lf?.tipoOrigen ?? m.referenciaTipo ?? null);
+                  const tipoOrigenStyle = tipoOrigenKey ? TIPO_ORIGEN_COLOR[tipoOrigenKey] : null;
 
                   const descLote = tp
                     ? `${tp.tipo} · ${tp.subtipoEntrada?.replace(/_/g, ' ') ?? ''}`
@@ -309,14 +315,14 @@ export function KardexPage() {
                         )}
                       </td>
                       <td style={{ ...TD, textAlign: 'center' }}>
-                        {tipoOrigen && tipoOrigenStyle ? (
+                        {tipoOrigenKey && tipoOrigenStyle ? (
                           <span style={{
                             display: 'inline-block', padding: '2px 6px',
                             borderRadius: '4px', fontSize: '0.58rem', fontWeight: 700,
                             backgroundColor: tipoOrigenStyle.bg, color: tipoOrigenStyle.text,
                             letterSpacing: '0.04em',
                           }}>
-                            {TIPO_ORIGEN_LABEL[tipoOrigen]}
+                            {TIPO_ORIGEN_LABEL[tipoOrigenKey]}
                           </span>
                         ) : <span style={{ color: '#9CA3AF' }}>—</span>}
                       </td>
@@ -392,8 +398,8 @@ export function KardexPage() {
             const isExit   = m.tipoMovimiento === 'SALIDA';
             const isMerma  = m.tipoMovimiento === 'MERMA';
             const origen   = getOrigenes(m);
-            const tipoOrigen = lf?.tipoOrigen;
-            const tipoOrigenStyle = tipoOrigen ? TIPO_ORIGEN_COLOR[tipoOrigen] : null;
+            const tipoOrigenKey = lf?.tipoOrigen ?? m.referenciaTipo ?? null;
+            const tipoOrigenStyle = tipoOrigenKey ? TIPO_ORIGEN_COLOR[tipoOrigenKey] : null;
 
             return (
               <div key={m.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -450,12 +456,12 @@ export function KardexPage() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    {tipoOrigen && tipoOrigenStyle && (
+                    {tipoOrigenKey && tipoOrigenStyle && (
                       <span style={{
                         padding: '2px 7px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 700,
                         backgroundColor: tipoOrigenStyle.bg, color: tipoOrigenStyle.text,
                       }}>
-                        {TIPO_ORIGEN_LABEL[tipoOrigen]}
+                        {TIPO_ORIGEN_LABEL[tipoOrigenKey]}
                       </span>
                     )}
                     {origen !== '—' && (

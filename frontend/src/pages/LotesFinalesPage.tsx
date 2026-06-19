@@ -21,6 +21,8 @@ const ESTADO_COLOR: Record<LoteFinalEstado, string> = {
 const ORIGEN_LABEL = { DIRECTO: 'Directo', DIVISION: 'División', MEZCLA: 'Mezcla' };
 
 function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () => void; onConfirm: (dto: TrillarDto) => Promise<void> }) {
+  const PLANTAS = ['CB Jaen', 'CB Lima', 'Expocafé', 'Kuska', 'Mego', 'Selva Norte', 'Aicasa', 'Norandino', 'Negrisa'];
+
   const [form, setForm] = useState<Partial<TrillarDto>>({
     fecha: new Date().toISOString().slice(0, 10),
     pesoPorQuintalKg: undefined,
@@ -29,6 +31,7 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
     mermaDesechableKg: 0,
     sobranteExportableKg: 0,
   });
+  const [plantaOtro, setPlantaOtro] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -94,7 +97,30 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Fecha *</label><input type="date" value={form.fecha ?? ''} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} className={cls} /></div>
-            <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Planta *</label><input value={form.planta ?? ''} onChange={e => setForm(f => ({ ...f, planta: e.target.value || undefined }))} className={cls} /></div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Planta *</label>
+              <select
+                value={plantaOtro ? 'Otro' : (form.planta ?? '')}
+                onChange={e => {
+                  if (e.target.value === 'Otro') { setPlantaOtro(true); setForm(f => ({ ...f, planta: undefined })); }
+                  else { setPlantaOtro(false); setForm(f => ({ ...f, planta: e.target.value || undefined })); }
+                }}
+                className={cls}
+              >
+                <option value="">Seleccionar…</option>
+                {PLANTAS.map(p => <option key={p} value={p}>{p}</option>)}
+                <option value="Otro">Otro…</option>
+              </select>
+              {plantaOtro && (
+                <input
+                  autoFocus
+                  value={form.planta ?? ''}
+                  onChange={e => setForm(f => ({ ...f, planta: e.target.value || undefined }))}
+                  className={`${cls} mt-1.5`}
+                  placeholder="Nombre de la planta…"
+                />
+              )}
+            </div>
             <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Malla *</label><input value={form.malla ?? ''} onChange={e => setForm(f => ({ ...f, malla: e.target.value || undefined }))} className={cls} /></div>
             <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Tipo Selección *</label><input value={form.tipoSeleccion ?? ''} onChange={e => setForm(f => ({ ...f, tipoSeleccion: e.target.value || undefined }))} className={cls} /></div>
           </div>
@@ -186,7 +212,10 @@ function DetalleModal({ id, onClose }: { id: number; onClose: () => void }) {
     Promise.all([
       lotesFinalesService.getDetalle(id),
       lotesFinalesService.getKardex(id),
-    ]).then(([d, c]) => { setDetalle(d); setKardex(c); setLoading(false); });
+    ])
+      .then(([d, c]) => { setDetalle(d); setKardex(c); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) return (

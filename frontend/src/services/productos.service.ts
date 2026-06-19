@@ -32,7 +32,7 @@ export interface PagedResult {
 }
 
 const CACHE_KEY = 'collective_bean_productos_cache';
-const BASE = '/api/productos';
+const BASE = '/productos';
 
 function readCache(): Producto[] {
   try {

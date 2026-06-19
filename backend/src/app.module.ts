@@ -24,8 +24,9 @@ import { TrilladoModule } from './trillado/trillado.module';
 import { KardexModule } from './kardex/kardex.module';
 import { MuestrasModule } from './muestras/muestras.module';
 import { ReportesModule } from './reportes/reportes.module';
-import { MermasModule }  from './mermas/mermas.module';
-import { Merma }         from './mermas/merma.entity';
+import { MermasModule }        from './mermas/mermas.module';
+import { Merma }               from './mermas/merma.entity';
+import { OrdenesVentaModule }  from './ordenes-venta/ordenes-venta.module';
 
 import { User } from './users/user.entity';
 import { Campana } from './campanas/campana.entity';
@@ -48,6 +49,13 @@ import { MovimientoKardex } from './kardex/movimiento-kardex.entity';
 import { Muestra } from './muestras/muestra.entity';
 import { EvaluacionFisica } from './muestras/evaluacion-fisica.entity';
 import { EvaluacionSensorial } from './muestras/evaluacion-sensorial.entity';
+import { OrdenVenta }       from './ordenes-venta/orden-venta.entity';
+import { OrdenPaso }        from './ordenes-venta/orden-paso.entity';
+import { OrdenPreventa }    from './ordenes-venta/orden-preventa.entity';
+import { OrdenCotizacion }  from './ordenes-venta/orden-cotizacion.entity';
+import { OrdenAlistado }    from './ordenes-venta/orden-alistado.entity';
+import { OrdenExportacion } from './ordenes-venta/orden-exportacion.entity';
+import { OrdenPostVenta }   from './ordenes-venta/orden-post-venta.entity';
 
 import { AppController } from './app.controller';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -78,7 +86,8 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
           Lote, LoteFinal, LoteFinalOrigen,
           Trillado, MovimientoKardex,
           Muestra, EvaluacionFisica, EvaluacionSensorial,
-          Merma,
+          Merma, OrdenVenta, OrdenPaso, OrdenPreventa, OrdenCotizacion,
+          OrdenAlistado, OrdenExportacion, OrdenPostVenta,
         ],
         synchronize: true,
         logging: config.get<string>('NODE_ENV') === 'development',
@@ -99,6 +108,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     MuestrasModule,
     ReportesModule,
     MermasModule,
+    OrdenesVentaModule,
   ],
 
   controllers: [AppController],

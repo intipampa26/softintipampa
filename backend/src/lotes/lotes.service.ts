@@ -159,7 +159,7 @@ export class LotesService {
       }));
 
       
-      await qr.manager.update(Lote, id, { estado: LoteEstado.PREPARADO });
+      await qr.manager.update(Lote, id, { estado: LoteEstado.PREPARADO, cantidadKg: 0 });
 
       await qr.commitTransaction();
 

@@ -152,7 +152,7 @@ export interface PagedResult {
 }
 
 const CACHE_KEY = 'collective_bean_parcelas_cache';
-const BASE = '/api/parcelas';
+const BASE = '/parcelas';
 
 function readCache(): Parcela[] {
   try {

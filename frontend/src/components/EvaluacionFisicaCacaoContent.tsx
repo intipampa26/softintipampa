@@ -4,6 +4,8 @@ import { muestrasService, Muestra } from '@/services/muestras.service';
 const CP  = '#1A2B23';
 const CS  = '#283F34';
 
+const VARIEDADES_CACAO = ['Cacao','Macambo','Cupui','Copuazu','Manteca de cacao','Polvo de cacao','Nibs de cacao','Pasta de cacao'];
+
 type TwoCol = { a: string; b: string };
 
 const n   = (v: string) => parseFloat(v) || 0;
@@ -195,7 +197,10 @@ export function EvaluacionFisicaCacaoContent({
           </div>
           <div>
             <label className={LABEL}>Variedad</label>
-            <input value={variedad} onChange={e => setVariedad(e.target.value)} className={FIELD} placeholder="CCN51, Chuncho…" />
+            <select value={variedad} onChange={e => setVariedad(e.target.value)} className={FIELD}>
+              <option value="">Seleccionar…</option>
+              {VARIEDADES_CACAO.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
           </div>
           <div>
             <label className={LABEL}>Fecha cosecha</label>

@@ -17,6 +17,14 @@ import { MovimientoKardex }     from '../kardex/movimiento-kardex.entity';
 import { Muestra }             from '../muestras/muestra.entity';
 import { EvaluacionFisica }    from '../muestras/evaluacion-fisica.entity';
 import { EvaluacionSensorial } from '../muestras/evaluacion-sensorial.entity';
+import { OrdenVenta }          from '../ordenes-venta/orden-venta.entity';
+import { OrdenPaso }           from '../ordenes-venta/orden-paso.entity';
+import { OrdenPreventa }       from '../ordenes-venta/orden-preventa.entity';
+import { OrdenCotizacion }     from '../ordenes-venta/orden-cotizacion.entity';
+import { OrdenAlistado }       from '../ordenes-venta/orden-alistado.entity';
+import { OrdenExportacion }    from '../ordenes-venta/orden-exportacion.entity';
+import { OrdenPostVenta }      from '../ordenes-venta/orden-post-venta.entity';
+import { Merma }               from '../mermas/merma.entity';
 
 @Module({
   imports: [
@@ -28,6 +36,9 @@ import { EvaluacionSensorial } from '../muestras/evaluacion-sensorial.entity';
       Lote, LoteFinal, LoteFinalOrigen,
       Trillado, MovimientoKardex,
       Muestra, EvaluacionFisica, EvaluacionSensorial,
+      OrdenVenta, OrdenPaso, OrdenPreventa, OrdenCotizacion,
+      OrdenAlistado, OrdenExportacion, OrdenPostVenta,
+      Merma,
     ]),
   ],
   providers: [SeedService],

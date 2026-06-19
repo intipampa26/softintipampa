@@ -28,6 +28,7 @@ import { MermasPage }          from '@/pages/MermasPage';
 import { OperacionesPage } from '@/pages/OperacionesPage';
 import { RegistroMuestraPage } from '@/pages/RegistroMuestraPage';
 import { EvaluacionCafeVerdePage } from '@/pages/EvaluacionCafeVerdePage';
+import { DashboardIndicadores } from '@/pages/DashboardIndicadores';
 
 export default function App() {
   return (
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="operaciones"   element={<OperacionesPage />} />
             <Route path="mermas"        element={<MermasPage />} />
             <Route path="kardex"        element={<KardexPage />} />
+            <Route path="indicadores"   element={<DashboardIndicadores />} />
             <Route path="reportes"      element={<ReportesPage />} />
             <Route path="configuracion" element={<ConfiguracionPage />} />
           </Route>

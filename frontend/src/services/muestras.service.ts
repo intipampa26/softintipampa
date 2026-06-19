@@ -35,6 +35,7 @@ export interface Muestra {
   pais: string | null;
   region: string | null;
   estadoLote: string | null;
+  loteCreado: boolean | null;
   activo: boolean;
   createdAt: string;
   campana?: { id: number; nombre: string };
@@ -99,6 +100,7 @@ export interface CreateMuestraDto {
   pais?: string;
   region?: string;
   estadoLote?: string;
+  loteCreado?: boolean;
 }
 
 export interface FilterMuestrasDto {
@@ -230,7 +232,7 @@ class MuestrasService {
       return { data: all.slice(start, start + limit), meta: buildMeta(all, page, limit) };
     }
     try {
-      const res  = await api.get('/api/muestras', { params: filter });
+      const res  = await api.get('/muestras', { params: filter });
       const data: Muestra[] = Array.isArray(res.data) ? res.data : [];
       const meta: PaginationMeta =
         (res as unknown as { meta: PaginationMeta }).meta ??
@@ -260,7 +262,7 @@ class MuestrasService {
       if (cached) return cached;
       throw new Error('Sin conexión y sin datos en caché');
     }
-    const { data } = await api.get(`/api/muestras/${id}`);
+    const { data } = await api.get(`/muestras/${id}`);
     return data;
   }
 
@@ -268,13 +270,13 @@ class MuestrasService {
     if (!navigator.onLine) {
       const cached = readDetalleCache(id);
       if (cached) return cached;
-      
+
       const muestra = readCache().find((m) => m.id === id);
       if (muestra) return { muestra, evaluacionFisica: null, evaluacionSensorial: null };
       throw new Error('Sin conexión y sin detalle en caché');
     }
     try {
-      const { data } = await api.get(`/api/muestras/${id}/detalle`);
+      const { data } = await api.get(`/muestras/${id}/detalle`);
       writeDetalleCache(id, data);
       return data;
     } catch {
@@ -288,7 +290,7 @@ class MuestrasService {
 
   async create(dto: CreateMuestraDto): Promise<Muestra> {
     if (!navigator.onLine) {
-      syncService.enqueue({ url: '/api/muestras', method: 'POST', body: dto, module: 'muestras' });
+      syncService.enqueue({ url: '/muestras', method: 'POST', body: dto, module: 'muestras' });
       const fake: Muestra = {
         id:              Date.now(),
         codigo:          `MUE-OFFLINE-${Date.now()}`,
@@ -315,6 +317,7 @@ class MuestrasService {
         pais:            dto.pais            ?? null,
         region:          dto.region          ?? null,
         estadoLote:      null,
+        loteCreado:      dto.loteCreado ?? null,
         productorId:     dto.productorId,
         campanaId:       dto.campanaId,
         loteId:          dto.loteId          ?? null,
@@ -325,21 +328,21 @@ class MuestrasService {
       writeCache([fake, ...readCache()]);
       return fake;
     }
-    const { data } = await api.post('/api/muestras', toApiPayload(dto));
+    const { data } = await api.post('/muestras', toApiPayload(dto));
     writeCache([data, ...readCache().filter((m) => !m._pendiente || m.id !== data.id)]);
     return data;
   }
 
   async update(id: number, dto: Partial<CreateMuestraDto>): Promise<Muestra> {
     if (!navigator.onLine) {
-      syncService.enqueue({ url: `/api/muestras/${id}`, method: 'PUT', body: toApiPayload(dto), module: 'muestras' });
+      syncService.enqueue({ url: `/muestras/${id}`, method: 'PUT', body: toApiPayload(dto), module: 'muestras' });
       const cache = readCache().map((m) =>
         m.id === id ? { ...m, ...dto, updatedAt: new Date().toISOString() } : m,
       );
       writeCache(cache);
       return cache.find((m) => m.id === id) as Muestra;
     }
-    const { data } = await api.put(`/api/muestras/${id}`, toApiPayload(dto));
+    const { data } = await api.put(`/muestras/${id}`, toApiPayload(dto));
     writeCache(readCache().map((m) => (m.id === id ? data : m)));
     return data;
   }
@@ -356,11 +359,11 @@ class MuestrasService {
 
   async remove(id: number): Promise<void> {
     if (!navigator.onLine) {
-      syncService.enqueue({ url: `/api/muestras/${id}`, method: 'DELETE', module: 'muestras' });
+      syncService.enqueue({ url: `/muestras/${id}`, method: 'DELETE', module: 'muestras' });
       writeCache(readCache().filter((m) => m.id !== id));
       return;
     }
-    await api.delete(`/api/muestras/${id}`);
+    await api.delete(`/muestras/${id}`);
     writeCache(readCache().filter((m) => m.id !== id));
   }
 
@@ -372,7 +375,7 @@ class MuestrasService {
   ): Promise<EvaluacionFisica> {
     const payload = toEvalFisicaPayload(dto);
     if (!navigator.onLine) {
-      syncService.enqueue({ url: `/api/muestras/${muestraId}/evaluacion-fisica`, method: 'POST', body: payload, module: 'muestras' });
+      syncService.enqueue({ url: `/muestras/${muestraId}/evaluacion-fisica`, method: 'POST', body: payload, module: 'muestras' });
       const fake = { id: Date.now(), muestraId, ...dto } as EvaluacionFisica;
       const det  = readDetalleCache(muestraId);
       if (det) writeDetalleCache(muestraId, { ...det, evaluacionFisica: fake });
@@ -384,7 +387,7 @@ class MuestrasService {
       }
       return fake;
     }
-    const { data } = await api.post(`/api/muestras/${muestraId}/evaluacion-fisica`, payload);
+    const { data } = await api.post(`/muestras/${muestraId}/evaluacion-fisica`, payload);
     const det2 = readDetalleCache(muestraId);
     if (det2) writeDetalleCache(muestraId, { ...det2, evaluacionFisica: data });
     
@@ -400,7 +403,7 @@ class MuestrasService {
   ): Promise<EvaluacionSensorial> {
     const payload = toEvalSensorialPayload(dto);
     if (!navigator.onLine) {
-      syncService.enqueue({ url: `/api/muestras/${muestraId}/evaluacion-sensorial`, method: 'POST', body: payload, module: 'muestras' });
+      syncService.enqueue({ url: `/muestras/${muestraId}/evaluacion-sensorial`, method: 'POST', body: payload, module: 'muestras' });
       const fake = { id: Date.now(), muestraId, ...dto } as EvaluacionSensorial;
       const det  = readDetalleCache(muestraId);
       if (det) writeDetalleCache(muestraId, { ...det, evaluacionSensorial: fake });
@@ -412,7 +415,7 @@ class MuestrasService {
       }
       return fake;
     }
-    const { data } = await api.post(`/api/muestras/${muestraId}/evaluacion-sensorial`, payload);
+    const { data } = await api.post(`/muestras/${muestraId}/evaluacion-sensorial`, payload);
     const det2 = readDetalleCache(muestraId);
     if (det2) writeDetalleCache(muestraId, { ...det2, evaluacionSensorial: data });
     
@@ -428,7 +431,7 @@ class MuestrasService {
     data: Array<{ muestra: Muestra; evaluacionFisica: Record<string, unknown> | null; evaluacionSensorial: Record<string, unknown> | null }>;
     meta: PaginationMeta;
   }> {
-    const res  = await api.get('/api/muestras/export/preview', { params: filter });
+    const res  = await api.get('/muestras/export/preview', { params: filter });
     const data = Array.isArray(res.data) ? res.data : [];
     const meta = (res as unknown as { meta: PaginationMeta }).meta ?? { total: 0, page: 1, lastPage: 1, limit: 20 };
     return { data, meta };
@@ -454,7 +457,7 @@ class MuestrasService {
     const token = storageService.getAccessToken();
     const form  = new FormData();
     form.append('file', file);
-    const resp = await fetch('/api/muestras/import', {
+    const resp = await fetch('/muestras/import', {
       method:  'POST',
       headers: { Authorization: `Bearer ${token}` },
       body:    form,

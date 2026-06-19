@@ -38,4 +38,5 @@ export class CreateMuestraDto {
   @IsString() @IsOptional() observaciones?: string;
 
   @IsBoolean() @IsOptional() activo?: boolean;
+  @IsBoolean() @IsOptional() loteCreado?: boolean;
 }

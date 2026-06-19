@@ -18,9 +18,11 @@ export enum TipoMovimientoKardex {
 }
 
 export enum ReferenciaTipoKardex {
-  TRILLADO = 'TRILLADO',
-  VENTA    = 'VENTA',
-  AJUSTE   = 'AJUSTE',
+  TRILLADO          = 'TRILLADO',
+  VENTA             = 'VENTA',
+  AJUSTE            = 'AJUSTE',
+  MUESTRA           = 'MUESTRA',
+  PREVENTA_MUESTRA  = 'PREVENTA_MUESTRA',
 }
 
  

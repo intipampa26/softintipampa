@@ -50,6 +50,17 @@ export class LotesFinalesService {
       where['id'] = In(ids);
     }
 
+    if (filter.productorId) {
+      const rows = await this.origenRepo
+        .createQueryBuilder('fo')
+        .select('DISTINCT fo."loteFinalId"', 'id')
+        .innerJoin('lotes', 'l', 'l.id = fo."loteOrigenId" AND l."productorId" = :pid', { pid: filter.productorId })
+        .getRawMany<{ id: number }>();
+      const ids = rows.map(r => Number(r.id));
+      if (ids.length === 0) return { data: [], meta: { total: 0, page: filter.page, lastPage: 1, limit: filter.limit } };
+      where['id'] = In(ids);
+    }
+
     return paginate(this.lfRepo, filter, {
       where,
       relations: ['tipoProducto', 'campana'],

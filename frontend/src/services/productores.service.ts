@@ -150,7 +150,7 @@ export interface ImportReport {
 }
 
 const CACHE_KEY = 'collective_bean_productores_cache';
-const BASE = '/api/productores';
+const BASE = '/productores';
 
 function readCache(): Productor[] {
   try {

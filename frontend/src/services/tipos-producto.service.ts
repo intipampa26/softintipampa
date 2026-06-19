@@ -20,7 +20,7 @@ class TiposProductoService {
   async getAll(): Promise<TipoProducto[]> {
     if (!navigator.onLine) return readCache();
     try {
-      const { data } = await api.get('/api/tipos-producto');
+      const { data } = await api.get('/tipos-producto');
       const list = Array.isArray(data) ? data : [];
       localStorage.setItem(CACHE_KEY, JSON.stringify(list));
       return list;

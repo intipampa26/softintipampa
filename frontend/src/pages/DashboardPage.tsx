@@ -1,203 +1,263 @@
-import {
-  AreaChart, Area,
-  BarChart, Bar,
-  XAxis, YAxis,
-  CartesianGrid, Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { KpiCard } from '@/components/dashboard/KpiCard';
+import { FiltroDashboard } from '@/components/dashboard/FiltroDashboard';
+import { AcopioSection } from '@/components/dashboard/AcopioSection';
+import { TrillaSection } from '@/components/dashboard/TrillaSection';
+import { VentasSection } from '@/components/dashboard/VentasSection';
+import type { FiltroAño } from '@/types/dashboard.types';
 
-const areaData = Array.from({ length: 30 }, (_, i) => {
-  const t = i / 29;
-  return {
-    day: i + 1,
-    top:    Math.round(2600 + Math.sin(t * Math.PI * 4.2) * 500 + Math.sin(t * Math.PI * 2.3) * 280),
-    mid:    Math.round(1480 + Math.sin(t * Math.PI * 3.8 + 1.1) * 330 + Math.sin(t * Math.PI * 2.1) * 140),
-    bottom: Math.round(870  + Math.sin(t * Math.PI * 5.1 + 2.4) * 180 + Math.sin(t * Math.PI * 2.7) * 90),
-  };
-});
+const CP = '#445D46';
+const TX = '#2C2C2C';
 
-const barNetMargin = [
-  { n: '1', v: 6 }, { n: '2', v: 8.2 }, { n: '3', v: 9.1 },
-  { n: '4', v: 12 }, { n: '5', v: 7.8 }, { n: '6', v: 4.3 }, { n: '7', v: 6.5 },
-];
+const fmt  = (n: number) => n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtU = (n: number) => '$' + n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtK = (n: number) => n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg';
 
-const barDebtEquity = [
-  { n: '1', b: 6.2, r: 2.8 }, { n: '2', b: 8.8, r: 1.4 },
-  { n: '3', b: 6.5, r: 5.1 }, { n: '4', b: 4.8, r: 0.6 },
-  { n: '5', b: 7.4, r: 4.2 }, { n: '6', b: 5.8, r: 4.8 }, { n: '7', b: 7.1, r: 3.3 },
-];
+type Seccion = 'acopio' | 'trilla' | 'ventas';
 
-const KPIS = [
-  { label: 'Ingresos',           value: 'S/ 124.5K', delta: '↑ 13%',   sub: 'vs semana anterior', positive: true  },
-  { label: 'Margen Promedio',    value: '18.3%',     delta: '↑ 1.2',   sub: 'vs semana anterior', positive: true  },
-  { label: 'Retorno s/ Inv. (ROI)', value: '24.7%',  delta: '8%',      sub: 'vs semana anterior', positive: true  },
-  { label: 'Valor del Cliente',  value: 'S/ 2,847',  delta: '↑ 2.3%',  sub: 'vs semana anterior', positive: true  },
-];
-
-function KpiCard({ label, value, delta, sub, positive }: typeof KPIS[0]) {
+function IconAcopio() {
   return (
-    <div className="flex flex-col justify-between p-4 border-b border-r border-gray-100 last:border-r-0">
-      <p className="text-[0.65rem] text-gray-400 font-medium uppercase tracking-wider">{label}</p>
-      <div className="mt-1">
-        <p className="font-headline text-2xl font-bold text-gray-900 leading-tight">{value}</p>
-        <p className={`text-xs font-semibold mt-0.5 ${positive ? 'text-green-600' : 'text-red-500'}`}>{delta}</p>
-        <p className="text-[0.6rem] text-gray-400 mt-0.5">{sub}</p>
-      </div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10"/><path d="M12 2c0 5.5-4.5 10-10 10"/><path d="M12 2c0 5.5 4.5 10 10 10"/>
+    </svg>
+  );
+}
+function IconTrilla() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+    </svg>
+  );
+}
+function IconVentas() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+    </svg>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-0.5 h-5 rounded-full" style={{ background: CP }} />
+      <h2
+        className="text-[0.65rem] font-black uppercase"
+        style={{ color: CP, letterSpacing: '0.2em' }}
+      >
+        {children}
+      </h2>
+      <div className="flex-1 h-px" style={{ background: 'linear-gradient(to right, #D9DDD8, transparent)' }} />
     </div>
   );
 }
 
-const tooltipStyle = {
-  contentStyle: { fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' },
-  itemStyle: { padding: '1px 0' },
-};
-
 export function DashboardPage() {
   const { isOfflineSession } = useAuth();
-  const { isOffline } = useNetworkStatus();
+  const { acopio, trilla, ventas, loading, error, refetch } = useDashboardData();
+  const [año, setAño] = useState<FiltroAño>('ambos');
+  const [almacen, setAlmacen] = useState('todos');
+  const [seccion, setSeccion] = useState<Seccion>('acopio');
+
+  const almacenes = useMemo(() => {
+    const set = new Set<string>();
+    (acopio?.kgPorAlmacen ?? []).forEach(r => { if (r.almacen !== 'Sin almacén') set.add(r.almacen); });
+    return [...set];
+  }, [acopio]);
 
   return (
-    <div className={`p-4 md:p-8 min-h-full bg-white ${isOfflineSession ? 'pt-14' : ''}`}>
+    <div className={`p-4 md:p-8 min-h-full space-y-8 ${isOfflineSession ? 'pt-14' : ''}`} style={{ background: '#F7F8F7' }}>
 
-      <h1
-        className="font-headline text-2xl sm:text-3xl font-black uppercase tracking-wide text-gray-800 mb-6"
-        style={{ letterSpacing: '0.05em' }}
-      >
-        Dashboard
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1
+            className="font-headline text-2xl sm:text-3xl font-black uppercase"
+            style={{ color: TX, letterSpacing: '0.08em' }}
+          >
+            Dashboard
+          </h1>
+          <p className="text-[0.68rem] mt-0.5" style={{ color: '#96A897' }}>
+            Indicadores de campaña · Collective Bean
+          </p>
+        </div>
+        <button
+          onClick={refetch}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[0.72rem] font-bold transition-all hover:shadow-sm active:scale-95"
+          style={{
+            background: '#EFF2EF',
+            color: CP,
+          }}
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
+          Actualizar
+        </button>
+      </div>
 
-      {isOffline && isOfflineSession && (
-        <div className="mb-4 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 inline-flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-          Modo offline — datos de última sesión
+      {loading && (
+        <div className="flex flex-col items-center justify-center h-56 gap-3">
+          <div className="animate-spin rounded-full h-9 w-9 border-2" style={{ borderColor: CP, borderTopColor: 'transparent' }} />
+          <p className="text-xs" style={{ color: '#888' }}>Cargando indicadores...</p>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      {!loading && error && (
+        <div className="flex flex-col items-center justify-center h-40 gap-3">
+          <p className="text-sm" style={{ color: '#dc2626' }}>{error}</p>
+          <button onClick={refetch} className="px-4 py-2 rounded-lg text-xs font-semibold text-white" style={{ background: CP }}>
+            Reintentar
+          </button>
+        </div>
+      )}
 
-        <div className="px-6 pt-5 pb-4 border-b border-gray-100">
-          <p className="font-semibold text-gray-700 text-sm">Data Dashboard</p>
+      {!loading && !error && acopio && trilla && ventas && (() => {
+        const kg2024  = acopio.totalKgPorAño.find(y => y.año === 2024)?.kg ?? 0;
+        const kg2025  = acopio.totalKgPorAño.find(y => y.año === 2025)?.kg ?? 0;
+        const fob2024 = ventas.totalFOBPorAño.find(y => y.año === 2024)?.usd ?? 0;
+        const fob2025 = ventas.totalFOBPorAño.find(y => y.año === 2025)?.usd ?? 0;
 
-          <div className="flex items-center gap-6 mt-3 flex-wrap">
-            <div>
-              <p className="text-[0.6rem] text-gray-400 uppercase tracking-wider">Auto date range</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/>
-                  <line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>
-                </svg>
-                <span className="text-xs font-semibold text-gray-700">Esta Semana</span>
-              </div>
+        const totalAcopio = año === '2024' ? kg2024 : año === '2025' ? kg2025 : acopio.totalKgPergamino;
+        const totalFOB    = año === '2024' ? fob2024 : año === '2025' ? fob2025 : ventas.totalFOB;
+        const deltaAcopio = kg2024 > 0 ? ((kg2025 - kg2024) / kg2024) * 100 : undefined;
+        const deltaFOB    = fob2024 > 0 ? ((fob2025 - fob2024) / fob2024) * 100 : undefined;
+
+        const prod2024 = acopio.conteoProductores.find(r => r.año === 2024)?.conteo ?? 0;
+        const prod2025 = acopio.conteoProductores.find(r => r.año === 2025)?.conteo ?? 0;
+        const totalProd = año === '2024' ? prod2024 : año === '2025' ? prod2025 : prod2024 + prod2025;
+
+        return (
+          <>
+            <FiltroDashboard
+              año={año}
+              almacen={almacen}
+              almacenes={almacenes}
+              onAñoChange={a => { setAño(a); setAlmacen('todos'); }}
+              onAlmacenChange={setAlmacen}
+            />
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <KpiCard
+                label="Total Acopio"
+                value={fmtK(totalAcopio)}
+                sub={año === 'ambos' ? `2024: ${fmtK(kg2024)} · 2025: ${fmtK(kg2025)}` : `Global: ${fmtK(acopio.totalKgPergamino)}`}
+                delta={año === 'ambos' ? deltaAcopio : undefined}
+              />
+              <KpiCard
+                label="Ventas FOB"
+                value={fmtU(totalFOB)}
+                sub={año === 'ambos' ? `2024: ${fmtU(fob2024)} · 2025: ${fmtU(fob2025)}` : ''}
+                delta={año === 'ambos' ? deltaFOB : undefined}
+              />
+              <KpiCard
+                label="Rend. Trilla Prom."
+                value={trilla.rendimientoPromedio > 0 ? fmt(trilla.rendimientoPromedio) + '%' : '—'}
+                sub="Promedio global todos los lotes"
+              />
+              <KpiCard
+                label="Productores Activos"
+                value={String(totalProd)}
+                sub={año === 'ambos' ? `2024: ${prod2024} · 2025: ${prod2025}` : `Campaña ${año}`}
+              />
             </div>
-            {['Servicios', 'Reportes'].map((f) => (
-              <div key={f}>
-                <p className="text-[0.6rem] text-gray-400 uppercase tracking-wider">{f}</p>
-                <select className="mt-0.5 text-xs font-semibold text-gray-700 bg-transparent border-0 outline-none cursor-pointer pr-4">
-                  <option>Todos</option>
-                </select>
-              </div>
-            ))}
-          </div>
-        </div>
 
-        <div className="px-6 pt-5 pb-2">
-          <p className="text-[0.68rem] text-gray-400 mb-3">
-            Ingresos Antes de Intereses, Impuestos, Depreciación y Amortización (EBITDA)
-          </p>
-          <ResponsiveContainer width="100%" height={260}>
-            <AreaChart data={areaData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gTop" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor="#8dc58d" stopOpacity={0.65}/>
-                  <stop offset="100%" stopColor="#8dc58d" stopOpacity={0.15}/>
-                </linearGradient>
-                <linearGradient id="gMid" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor="#cd5c5c" stopOpacity={0.45}/>
-                  <stop offset="100%" stopColor="#cd5c5c" stopOpacity={0.05}/>
-                </linearGradient>
-                <linearGradient id="gBot" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor="#c4a882" stopOpacity={0.85}/>
-                  <stop offset="100%" stopColor="#c4a882" stopOpacity={0.55}/>
-                </linearGradient>
-              </defs>
+            <div
+              className="grid grid-cols-3 gap-3 rounded-2xl p-1.5"
+              style={{ background: '#EDF0ED' }}
+            >
+              {([
+                {
+                  key: 'acopio' as Seccion,
+                  label: 'Acopio',
+                  metric: fmtK(totalAcopio),
+                  sub: 'Café pergamino',
+                  icon: <IconAcopio />,
+                },
+                {
+                  key: 'trilla' as Seccion,
+                  label: 'Trilla',
+                  metric: trilla.rendimientoPromedio > 0 ? fmt(trilla.rendimientoPromedio) + '%' : '—',
+                  sub: 'Rendimiento prom.',
+                  icon: <IconTrilla />,
+                },
+                {
+                  key: 'ventas' as Seccion,
+                  label: 'Ventas',
+                  metric: fmtU(totalFOB),
+                  sub: 'Total FOB',
+                  icon: <IconVentas />,
+                },
+              ] as const).map(tab => {
+                const active = seccion === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setSeccion(tab.key)}
+                    className="relative flex flex-col items-start gap-2 rounded-xl px-4 py-3.5 text-left transition-all duration-200"
+                    style={{
+                      background: active ? '#fff' : 'transparent',
+                      boxShadow: active ? '0 1px 4px rgba(68,93,70,0.10), 0 4px 12px rgba(68,93,70,0.06)' : 'none',
+                      color: active ? CP : '#8FA88E',
+                    }}
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <span style={{ color: active ? CP : '#AFC2B0' }}>{tab.icon}</span>
+                      <span
+                        className="text-[0.68rem] font-black uppercase tracking-widest"
+                        style={{ color: active ? CP : '#8FA88E' }}
+                      >
+                        {tab.label}
+                      </span>
+                      {active && (
+                        <span
+                          className="ml-auto w-1.5 h-1.5 rounded-full"
+                          style={{ background: CP }}
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <p
+                        className="text-[0.95rem] font-black tabular-nums leading-tight"
+                        style={{ color: active ? TX : '#A0B5A0' }}
+                      >
+                        {tab.metric}
+                      </p>
+                      <p
+                        className="text-[0.6rem] font-medium mt-0.5"
+                        style={{ color: active ? '#96A897' : '#B8C8B9' }}
+                      >
+                        {tab.sub}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
 
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false}/>
-              <XAxis
-                dataKey="day" tick={{ fontSize: 10, fill: '#9ca3af' }}
-                tickLine={false} axisLine={false} interval={1}
-              />
-              <YAxis
-                domain={[0, 4000]} ticks={[0, 1000, 2000, 3000, 4000]}
-                tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
-                tickFormatter={(v) => v === 0 ? '0' : `${v / 1000}k`}
-                width={32}
-              />
-              <Tooltip
-                formatter={(v: number, name: string) => [
-                  `S/ ${v.toLocaleString()}`,
-                  name === 'top' ? 'EBITDA' : name === 'mid' ? 'Ingresos' : 'Costos',
-                ]}
-                {...tooltipStyle}
-              />
-
-              <Area type="monotone" dataKey="top"
-                stroke="#6aad6a" strokeWidth={1.8}
-                fill="url(#gTop)" dot={false} activeDot={{ r: 4 }}
-              />
-              <Area type="monotone" dataKey="mid"
-                stroke="#cd5c5c" strokeWidth={2}
-                fill="url(#gMid)" dot={false} activeDot={{ r: 4 }}
-              />
-              <Area type="monotone" dataKey="bottom"
-                stroke="#b49060" strokeWidth={1.5}
-                fill="url(#gBot)" dot={false} activeDot={{ r: 4 }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 border-t border-gray-100">
-
-          <div className="p-5 border-b sm:border-b md:border-b-0 border-r-0 sm:border-r md:border-r border-gray-100">
-            <p className="text-[0.68rem] text-gray-500 font-medium mb-3">Margen de Ganancia Neto</p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={barNetMargin} margin={{ top: 5, right: 5, left: -20, bottom: 0 }} barSize={22}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false}/>
-                <XAxis dataKey="n" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}/>
-                <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} domain={[0, 13]}/>
-                <Tooltip formatter={(v: number) => [`${v}%`, 'Margen']} {...tooltipStyle}/>
-                <Bar dataKey="v" fill="#7090c8" radius={[3, 3, 0, 0]}/>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="p-5 border-b md:border-b-0 border-r-0 md:border-r border-gray-100">
-            <p className="text-[0.68rem] text-gray-500 font-medium mb-3">Ratio Deuda-Capital</p>
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={barDebtEquity} margin={{ top: 5, right: 5, left: -20, bottom: 0 }} barSize={22}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false}/>
-                <XAxis dataKey="n" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}/>
-                <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} domain={[0, 13]}/>
-                <Tooltip
-                  formatter={(v: number, name: string) => [`${v}`, name === 'b' ? 'Capital' : 'Deuda']}
-                  {...tooltipStyle}
-                />
-                <Bar dataKey="b" stackId="s" fill="#7090c8" radius={[0, 0, 0, 0]}/>
-                <Bar dataKey="r" stackId="s" fill="#c85c5c" radius={[3, 3, 0, 0]}/>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="grid grid-cols-2 divide-y divide-x divide-gray-100 sm:col-span-2 md:col-span-1">
-            {KPIS.map((kpi) => (
-              <KpiCard key={kpi.label} {...kpi} />
-            ))}
-          </div>
-
-        </div>
-      </div>
+            <div
+              key={seccion}
+              className="space-y-5"
+              style={{ animation: 'fadeSlideIn 0.22s ease both' }}
+            >
+              <style>{`
+                @keyframes fadeSlideIn {
+                  from { opacity: 0; transform: translateY(6px); }
+                  to   { opacity: 1; transform: translateY(0); }
+                }
+              `}</style>
+              <SectionTitle>
+                {seccion === 'acopio' ? 'Acopio' : seccion === 'trilla' ? 'Trilla' : 'Ventas'}
+              </SectionTitle>
+              {seccion === 'acopio' && <AcopioSection data={acopio} año={año} almacen={almacen} />}
+              {seccion === 'trilla' && <TrillaSection data={trilla} año={año} almacen={almacen} />}
+              {seccion === 'ventas' && <VentasSection data={ventas} año={año} />}
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }

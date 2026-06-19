@@ -82,7 +82,7 @@ class LotesService {
   async getPage(filter: FilterLotesDto = {}): Promise<PagedLotes> {
     if (!navigator.onLine) return readCache();
     try {
-      const res  = await api.get('/api/lotes', { params: filter });
+      const res  = await api.get('/lotes', { params: filter });
       const data: Lote[] = Array.isArray(res.data) ? res.data : [];
       const meta: PaginationMeta = (res as unknown as { meta: PaginationMeta }).meta ?? { total: 0, page: 1, lastPage: 1, limit: 10 };
       const result = { data, meta };
@@ -92,41 +92,41 @@ class LotesService {
   }
 
   async getOne(id: number): Promise<Lote> {
-    const { data } = await api.get(`/api/lotes/${id}`);
+    const { data } = await api.get(`/lotes/${id}`);
     return data;
   }
 
   async getLotesFinalOrigen(loteId: number): Promise<LoteFinalOrigen[]> {
-    const { data } = await api.get(`/api/lotes/${loteId}/lotes-finales`);
+    const { data } = await api.get(`/lotes/${loteId}/lotes-finales`);
     return Array.isArray(data) ? data : [];
   }
 
   async create(dto: CreateLoteDto): Promise<Lote> {
-    const { data } = await api.post('/api/lotes', dto);
+    const { data } = await api.post('/lotes', dto);
     return data;
   }
 
   async update(id: number, dto: Partial<CreateLoteDto & { estado?: LoteEstado }>): Promise<Lote> {
-    const { data } = await api.put(`/api/lotes/${id}`, dto);
+    const { data } = await api.put(`/lotes/${id}`, dto);
     return data;
   }
 
   async remove(id: number): Promise<void> {
-    await api.delete(`/api/lotes/${id}`);
+    await api.delete(`/lotes/${id}`);
   }
 
   async dividir(dto: DividirLoteDto): Promise<import('./lotes-finales.service').LoteFinal[]> {
-    const { data } = await api.post('/api/lotes/dividir', dto);
+    const { data } = await api.post('/lotes/dividir', dto);
     return Array.isArray(data) ? data : [];
   }
 
   async mezclar(dto: MezclarLotesDto): Promise<import('./lotes-finales.service').LoteFinal> {
-    const { data } = await api.post('/api/lotes/mezclar', dto);
+    const { data } = await api.post('/lotes/mezclar', dto);
     return data;
   }
 
   async promoverALf(id: number, dto: PromoverLfDto = {}): Promise<import('./lotes-finales.service').LoteFinal> {
-    const { data } = await api.post(`/api/lotes/${id}/promover-a-lf`, dto);
+    const { data } = await api.post(`/lotes/${id}/promover-a-lf`, dto);
     return data;
   }
 }

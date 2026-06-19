@@ -18,7 +18,7 @@ export interface Configuracion {
 export type UpdateConfiguracionDto = Partial<Omit<Configuracion, 'id' | 'updatedAt'>>;
 
 const CACHE_KEY = 'collective_bean_configuracion_cache';
-const BASE      = '/api/configuracion';
+const BASE      = '/configuracion';
 
 function readCache(): Configuracion | null {
   try {

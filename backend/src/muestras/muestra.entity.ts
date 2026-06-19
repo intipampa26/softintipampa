@@ -53,6 +53,9 @@ export class Muestra {
   @JoinColumn({ name: 'loteId' })
   lote: Lote;
 
+  @Column({ nullable: true, default: null })
+  loteCreado: boolean | null;
+
   @Index()
   @Column()
   campanaId: number;

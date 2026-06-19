@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+
+const VARIEDADES_CAFE  = ['Caturra','Borbón Rojo','Borbon naranja','Gesha','Pacamara','Tabi','Sidra','Papayo','Blend','Pache','Costa Rica 95','Tipica','Catimor','Maragogipe','SL34','Villa Sarchí','Marsellesa','Limani'];
+const VARIEDADES_CACAO = ['Cacao','Macambo','Cupui','Copuazu','Manteca de cacao','Polvo de cacao','Nibs de cacao','Pasta de cacao'];
 import { useSearchParams } from 'react-router-dom';
 import {
   EvaluacionSensorialCacao,
@@ -313,7 +316,7 @@ interface MuestraFormModalProps {
   onSave: (dto: CreateMuestraDto, id?: number) => Promise<void>;
 }
 
-const PLANTAS_STD = ['CB Jaen', 'CB Lima', 'Kuska', 'Mego', 'Selva Norte'];
+const PLANTAS_STD = ['CB Jaen','CB Lima','Expocafé','Kuska','Mego','Selva Norte','Aicasa','Norandino','Negrisa'];
 
 function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }: MuestraFormModalProps) {
   const [productores,       setProductores]       = useState<Productor[]>([]);
@@ -321,11 +324,11 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
     const p = initial?.planta;
     return !!p && !PLANTAS_STD.includes(p);
   });
-  const [lotes,             setLotes]             = useState<Lote[]>([]);
-  const [lotesFinalesDisp,  setLotesFinalesDisp]  = useState<LoteFinal[]>([]);
-  const [loadingLF,         setLoadingLF]         = useState(false);
-  const [loteSearch,        setLoteSearch]        = useState('');
-  const [loadingSub,        setLoadingSub]        = useState(false);
+  const [lotes,              setLotes]              = useState<Lote[]>([]);
+  const [lotesFinalesPropios, setLotesFinalesPropios] = useState<LoteFinal[]>([]);
+  const [lotesFinalesDisp,   setLotesFinalesDisp]   = useState<LoteFinal[]>([]);
+  const [loadingLF,          setLoadingLF]          = useState(false);
+  const [loadingSub,         setLoadingSub]         = useState(false);
   const [tipoProductoId, setTipoProductoId] = useState<number | undefined>(
     initial?.lote ? (lotes.find(l => l.id === initial.loteId)?.tipoProductoId) : undefined
   );
@@ -393,31 +396,57 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
     }
   }, [calc, calcEsCafe, calcEsCacao]); 
 
-  
   useEffect(() => {
     const cid = form.campanaId ? Number(form.campanaId) : undefined;
-    if (!cid) { setProductores([]); setLotes([]); return; }
+    if (!cid) {
+      setProductores([]);
+      setLotes([]);
+      setLotesFinalesPropios([]);
+      setForm(f => ({ ...f, productorId: '' as unknown as number, loteId: undefined, loteFinalId: undefined }));
+      return;
+    }
+    setLoadingSub(true);
+    productoresService.getPage(1, 200, cid)
+      .then(ps => {
+        setProductores(ps.data);
+        setForm(f => ({
+          ...f,
+          productorId: ps.data.find(p => p.id === Number(f.productorId)) ? f.productorId : '' as unknown as number,
+          loteId: undefined,
+          loteFinalId: undefined,
+        }));
+      })
+      .finally(() => setLoadingSub(false));
+  }, [form.campanaId]);
+
+  useEffect(() => {
+    const cid = form.campanaId ? Number(form.campanaId) : undefined;
+    const pid = form.productorId ? Number(form.productorId) : undefined;
+    if (!cid || !pid) {
+      setLotes([]);
+      setLotesFinalesPropios([]);
+      setForm(f => ({ ...f, loteId: undefined, loteFinalId: undefined }));
+      return;
+    }
     setLoadingSub(true);
     Promise.all([
-      productoresService.getPage(1, 100, cid),
-      lotesService.getPage({ page: 1, limit: 100, campanaId: cid }),
-    ]).then(([ps, ls]) => {
-      setProductores(ps.data);
+      lotesService.getPage({ page: 1, limit: 200, campanaId: cid, productorId: pid }),
+      lotesFinalesService.getPage({ campanaId: cid, productorId: pid, limit: 200 }),
+    ]).then(([ls, lfs]) => {
       setLotes(ls.data);
-      setForm((f) => ({
+      setLotesFinalesPropios(lfs.data);
+      setForm(f => ({
         ...f,
-        productorId: ps.data.find((p) => p.id === Number(f.productorId))
-          ? f.productorId : '' as unknown as number,
-        loteId: ls.data.find((l) => l.id === f.loteId) ? f.loteId : undefined,
+        loteId:      ls.data.find(l  => l.id  === f.loteId)      ? f.loteId      : undefined,
+        loteFinalId: lfs.data.find(lf => lf.id === f.loteFinalId) ? f.loteFinalId : undefined,
       }));
     }).finally(() => setLoadingSub(false));
-  }, [form.campanaId]); 
+  }, [form.campanaId, form.productorId]);
 
   useEffect(() => {
     if (!form.loteId) {
       setLotesFinalesDisp([]);
       setLoadingLF(false);
-      setForm(f => ({ ...f, loteFinalId: undefined }));
       return;
     }
     setLoadingLF(true);
@@ -425,15 +454,10 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
       .then(res => {
         setLotesFinalesDisp(res.data);
         if (res.data.length === 1) setForm(f => ({ ...f, loteFinalId: res.data[0].id }));
-        else setForm(f => ({ ...f, loteFinalId: undefined }));
       })
       .catch(() => setLotesFinalesDisp([]))
       .finally(() => setLoadingLF(false));
-  }, [form.loteId]); 
-
-  const lotesFiltrados = loteSearch.trim()
-    ? lotes.filter((l) => l.codigo.toLowerCase().includes(loteSearch.toLowerCase()))
-    : lotes;
+  }, [form.loteId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -443,6 +467,7 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
     }
     setSaving(true); setError('');
     try {
+      const loteEraPreexistente = !!form.loteId;
       let loteId = form.loteId ? Number(form.loteId) : undefined;
 
       if (!loteId && !initial?.id && tipoProductoId) {
@@ -464,6 +489,7 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
         ...(form.cantidadKg != null && { cantidadKg: Number(form.cantidadKg) }),
         ...(form.añoCosecha != null && { añoCosecha: Number(form.añoCosecha) }),
         ...(form.puntaje    != null && { puntaje:    Number(form.puntaje)    }),
+        loteCreado: !loteEraPreexistente,
       }, initial?.id);
       onClose();
     } catch { setError('Error al guardar. Intenta de nuevo.'); }
@@ -533,30 +559,9 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Lote</label>
-                <select
-                  value={form.loteId ?? ''}
-                  onChange={(e) => {
-                    const loteId = e.target.value ? Number(e.target.value) : undefined;
-                    const lote   = lotes.find(l => l.id === loteId);
-                    const tipo   = lote?.tipoProducto?.tipo?.toLowerCase() as TipoMuestra | undefined;
-                    setTipoProductoId(lote?.tipoProductoId);
-                    setForm(f => ({ ...f, loteId, tipoMuestra: tipo ?? f.tipoMuestra, estadoLote: lote?.estado ?? undefined }));
-                  }}
-                  disabled={!form.campanaId || loadingSub}
-                  className={`${cls} disabled:opacity-40`}
-                >
-                  <option value="">{loadingSub ? 'Cargando…' : 'Sin lote (opcional)'}</option>
-                  {lotes.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.codigo} · {(l.tipoProducto?.tipo ?? '').toUpperCase()} ({Number(l.cantidadKg).toFixed(1)} kg){l.variedad ? ` · ${l.variedad}` : ''}
-                    </option>
-                  ))}
-                </select>
-                {form.loteId && (() => {
-                  const lote = lotes.find(l => l.id === form.loteId);
-                  if (!lote) return null;
-                  const estadoColors: Record<string, string> = {
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Lote / Lote Final</label>
+                {(() => {
+                  const ESTADO_COLORS: Record<string, string> = {
                     PRE_ADQUISICION:  'bg-orange-100 text-orange-700 border-orange-200',
                     POST_ADQUISICION: 'bg-blue-100 text-blue-700 border-blue-200',
                     PRE_TRILLADO:     'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -565,7 +570,7 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
                     EMBARCADO:        'bg-indigo-100 text-indigo-700 border-indigo-200',
                     EXPORTADO:        'bg-green-100 text-green-700 border-green-200',
                   };
-                  const estadoLabels: Record<string, string> = {
+                  const ESTADO_LABELS: Record<string, string> = {
                     PRE_ADQUISICION:  'Pre Adquisición',
                     POST_ADQUISICION: 'Post Adquisición',
                     PRE_TRILLADO:     'Pre Alistado',
@@ -573,14 +578,81 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
                     PREPARADO:        'Preparado',
                     EMBARCADO:        'Embarcado',
                     EXPORTADO:        'Exportado',
+                    PENDIENTE_TRILLADO: 'Pendiente alistado',
+                    TRILLADO:         'Alistado',
+                    VENDIDO:          'Vendido',
                   };
+                  const selectVal = form.loteId
+                    ? `lote-${form.loteId}`
+                    : form.loteFinalId && !form.loteId
+                      ? `lf-${form.loteFinalId}`
+                      : '';
+                  const selectedLote = form.loteId ? lotes.find(l => l.id === form.loteId) : null;
+                  const selectedLF   = (!form.loteId && form.loteFinalId) ? lotesFinalesPropios.find(lf => lf.id === form.loteFinalId) : null;
+
                   return (
-                    <p className="mt-1.5 text-xs text-gray-500">
-                      Estado del lote:{' '}
-                      <span className={`inline-block px-2 py-0.5 rounded-full border text-[0.65rem] font-bold ${estadoColors[lote.estado] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {estadoLabels[lote.estado] ?? lote.estado}
-                      </span>
-                    </p>
+                    <>
+                      <select
+                        value={selectVal}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (!val) {
+                            setTipoProductoId(undefined);
+                            setForm(f => ({ ...f, loteId: undefined, loteFinalId: undefined, estadoLote: undefined }));
+                            return;
+                          }
+                          if (val.startsWith('lote-')) {
+                            const loteId = Number(val.slice(5));
+                            const lote   = lotes.find(l => l.id === loteId);
+                            setTipoProductoId(lote?.tipoProductoId);
+                            setForm(f => ({ ...f, loteId, loteFinalId: undefined, tipoMuestra: (lote?.tipoProducto?.tipo?.toLowerCase() as TipoMuestra | undefined) ?? f.tipoMuestra, estadoLote: lote?.estado ?? undefined }));
+                          } else {
+                            const lfId = Number(val.slice(3));
+                            const lf   = lotesFinalesPropios.find(l => l.id === lfId);
+                            setTipoProductoId(lf?.tipoProductoId);
+                            setForm(f => ({ ...f, loteFinalId: lfId, loteId: undefined, tipoMuestra: (lf?.tipoProducto?.tipo?.toLowerCase() as TipoMuestra | undefined) ?? f.tipoMuestra, estadoLote: undefined }));
+                          }
+                        }}
+                        disabled={!form.productorId || loadingSub}
+                        className={`${cls} disabled:opacity-40`}
+                      >
+                        <option value="">{loadingSub ? 'Cargando…' : !form.productorId ? '← Elige productor primero' : 'Sin lote (opcional)'}</option>
+                        {lotes.length > 0 && (
+                          <optgroup label="— Lotes —">
+                            {lotes.map(l => (
+                              <option key={`lote-${l.id}`} value={`lote-${l.id}`}>
+                                {l.codigo} · {(l.tipoProducto?.tipo ?? '').toUpperCase()} ({Number(l.cantidadKg).toFixed(1)} kg){l.variedad ? ` · ${l.variedad}` : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {lotesFinalesPropios.length > 0 && (
+                          <optgroup label="— Lotes Finales —">
+                            {lotesFinalesPropios.map(lf => (
+                              <option key={`lf-${lf.id}`} value={`lf-${lf.id}`}>
+                                {lf.codigo} · {(lf.tipoProducto?.tipo ?? '').toUpperCase()} ({Number(lf.cantidadKg).toFixed(1)} kg)
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                      {selectedLote && (
+                        <p className="mt-1.5 text-xs text-gray-500">
+                          Estado:{' '}
+                          <span className={`inline-block px-2 py-0.5 rounded-full border text-[0.65rem] font-bold ${ESTADO_COLORS[selectedLote.estado] ?? 'bg-gray-100 text-gray-600'}`}>
+                            {ESTADO_LABELS[selectedLote.estado] ?? selectedLote.estado}
+                          </span>
+                        </p>
+                      )}
+                      {selectedLF && (
+                        <p className="mt-1.5 text-xs text-gray-500">
+                          Estado:{' '}
+                          <span className={`inline-block px-2 py-0.5 rounded-full border text-[0.65rem] font-bold ${ESTADO_COLORS[selectedLF.estado] ?? 'bg-gray-100 text-gray-600'}`}>
+                            {ESTADO_LABELS[selectedLF.estado] ?? selectedLF.estado}
+                          </span>
+                        </p>
+                      )}
+                    </>
                   );
                 })()}
               </div>
@@ -781,7 +853,10 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Variedad</label>
-                <input value={form.variedad ?? ''} onChange={(e) => set('variedad')(e.target.value)} className={cls} placeholder="Ej: Caturra…" />
+                <select value={form.variedad ?? ''} onChange={(e) => set('variedad')(e.target.value)} className={cls}>
+                  <option value="">Seleccionar…</option>
+                  {(calcEsCacao ? VARIEDADES_CACAO : VARIEDADES_CAFE).map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Proceso</label>
@@ -1111,13 +1186,16 @@ function AdquirirModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Variedad</label>
-              <input type="text" value={form.variedad} onChange={(e) => setForm(f => ({ ...f, variedad: e.target.value }))} className={cls} placeholder="Sin variedad" />
+              <select value={form.variedad} onChange={(e) => setForm(f => ({ ...f, variedad: e.target.value }))} className={cls}>
+                <option value="">Sin variedad</option>
+                {(lote?.tipoProducto?.tipo === 'CACAO' ? VARIEDADES_CACAO : VARIEDADES_CAFE).map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Planta</label>
               <select value={form.planta} onChange={(e) => setForm(f => ({ ...f, planta: e.target.value }))} className={cls}>
                 <option value="">Sin planta</option>
-                {['CB Jaen', 'CB Lima', 'Kuska', 'Mego', 'Selva Norte'].map(p => <option key={p} value={p}>{p}</option>)}
+                {['CB Jaen','CB Lima','Expocafé','Kuska','Mego','Selva Norte','Aicasa','Norandino','Negrisa'].map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
           </div>
@@ -1225,7 +1303,7 @@ function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir
               Proceso: <span className="text-gray-600 font-semibold">{muestra.proceso}</span>
             </p>
           )}
-          {muestra.lote?.estado === 'PRE_ADQUISICION' && onAdquirir && (
+          {muestra.lote?.estado === 'PRE_ADQUISICION' && muestra.loteCreado === true && onAdquirir && (
             <button
               onClick={onAdquirir}
               className="mt-1 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.65rem] font-bold text-white uppercase tracking-wide hover:opacity-90 active:scale-[0.97] transition-all"
@@ -1668,7 +1746,7 @@ export function MuestrasPage() {
                   onEvaluaciones={() => { setSelected(m); setModal('evaluaciones'); }}
                   onEditar={()       => { setSelected(m); setModal('edit'); }}
                   onEliminar={()     => { setSelected(m); setModal('delete'); }}
-                  onAdquirir={m.lote?.estado === 'PRE_ADQUISICION' ? () => handleAdquirir(m) : undefined}
+                  onAdquirir={m.lote?.estado === 'PRE_ADQUISICION' && m.loteCreado === true ? () => handleAdquirir(m) : undefined}
                 />
               ))}
             </div>

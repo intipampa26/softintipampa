@@ -45,7 +45,7 @@ export function validateFile(file: File): string | null {
 }
 
 const cacheKey = (pid: number) => `collective_bean_evidencias_familiares_${pid}`;
-const BASE     = '/api/evidencias-familiares';
+const BASE     = '/evidencias-familiares';
 
 function readCache(productorId: number): EvidenciaFamiliar[] {
   try {

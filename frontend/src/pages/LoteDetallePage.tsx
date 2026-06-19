@@ -11,6 +11,14 @@ function apiMsg(err: unknown): string {
   return e?.response?.data?.message ?? e?.message ?? 'Error inesperado';
 }
 
+const POST_TRILLADO: LoteEstado[] = ['POST_TRILLADO', 'PREPARADO', 'EMBARCADO', 'EXPORTADO'];
+function displaySubtipo(estado: LoteEstado, tp?: { tipo: string; subtipoEntrada: string }) {
+  if (!tp) return '';
+  return tp.tipo === 'CAFE'
+    ? (POST_TRILLADO.includes(estado) ? 'Café Pergamino' : 'Café Oro Verde')
+    : tp.subtipoEntrada.replace(/_/g, ' ');
+}
+
 const ESTADO_LABEL: Record<string, string> = {
   PRE_ADQUISICION:  'Pre Adquisición',
   POST_ADQUISICION: 'Post Adquisición',
@@ -30,25 +38,56 @@ const ESTADO_COLOR: Record<string, string> = {
   EXPORTADO:        'bg-indigo-100 text-indigo-700 border-indigo-200',
 };
 
-function PromoverModal({ lote, onClose, onConfirm }: { lote: Lote; onClose: () => void; onConfirm: (codigoLf?: string) => Promise<void> }) {
+function PromoverModal({ lote, onClose, onConfirm }: { lote: Lote; onClose: () => void; onConfirm: (codigoLf?: string) => Promise<string> }) {
   const [codigo, setCodigo] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error,  setError]  = useState('');
+  const [done,   setDone]   = useState('');
+
+  async function handleConfirm() {
+    setSaving(true);
+    setError('');
+    try {
+      const lfCodigo = await onConfirm(codigo || undefined);
+      setDone(lfCodigo);
+      setTimeout(onClose, 2000);
+    } catch (err) {
+      setError(apiMsg(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }} onClick={e => !done && e.target === e.currentTarget && onClose()}>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 relative overflow-hidden">
         {saving && <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.93)', backdropFilter: 'blur(2px)' }}><LoadingLogo compact /></div>}
-        <h3 className="font-bold text-gray-800 mb-1">Pasar directo a Lote Final</h3>
-        <p className="text-xs text-gray-500 mb-4">El lote <strong>{lote.codigo}</strong> ({Number(lote.cantidadKg).toFixed(2)} kg) se promoverá tal cual a Lote Final.</p>
-        {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{error}</p>}
-        <div className="mb-4">
-          <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Código LF (opcional)</label>
-          <input value={codigo} onChange={e => setCodigo(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Auto-generado si vacío" />
-        </div>
-        <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancelar</button>
-          <button onClick={async () => { setSaving(true); try { await onConfirm(codigo || undefined); onClose(); } catch (err) { setError(apiMsg(err)); } finally { setSaving(false); } }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: '#2d5a3d' }}>Confirmar</button>
-        </div>
+
+        {done ? (
+          <div className="flex flex-col items-center text-center py-2">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4" style={{ backgroundColor: '#D1FAE5' }}>
+              <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="#065F46" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <p className="font-black text-gray-800 text-base mb-1">¡Lote Final creado!</p>
+            <p className="text-xs text-gray-500 mb-3">Se promovió correctamente desde <strong>{lote.codigo}</strong></p>
+            <span className="px-4 py-1.5 rounded-full text-sm font-black" style={{ backgroundColor: '#D1FAE5', color: '#065F46' }}>{done}</span>
+            <p className="text-[0.65rem] text-gray-400 mt-4">Cerrando automáticamente…</p>
+          </div>
+        ) : (
+          <>
+            <h3 className="font-bold text-gray-800 mb-1">Pasar directo a Lote Final</h3>
+            <p className="text-xs text-gray-500 mb-4">El lote <strong>{lote.codigo}</strong> ({Number(lote.cantidadKg).toFixed(2)} kg) se promoverá tal cual a Lote Final.</p>
+            {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{error}</p>}
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Código LF (opcional)</label>
+              <input value={codigo} onChange={e => setCodigo(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Auto-generado si vacío" />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancelar</button>
+              <button onClick={handleConfirm} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: '#2d5a3d' }}>Confirmar</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -263,7 +302,7 @@ function MezclarModal({ lote, onClose, onConfirm }: {
                 style={{ backgroundColor: '#EEF3EC', borderColor: '#C8DCC8', color: '#1A2B23' }}>
                 <span>{lote.tipoProducto.tipo}</span>
                 <span className="text-gray-400">·</span>
-                <span className="capitalize">{lote.tipoProducto.subtipoEntrada.replace(/_/g, ' ')}</span>
+                <span className="capitalize">{displaySubtipo(lote.estado, lote.tipoProducto)}</span>
               </div>
             )}
           </div>
@@ -290,7 +329,7 @@ function MezclarModal({ lote, onClose, onConfirm }: {
                   <p className="text-sm font-bold text-gray-800">{lote.codigo}</p>
                   {lote.tipoProducto && (
                     <span className="text-[0.6rem] font-semibold px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-500 capitalize">
-                      {lote.tipoProducto.tipo} · {lote.tipoProducto.subtipoEntrada.replace(/_/g, ' ')}
+                      {lote.tipoProducto.tipo} · {displaySubtipo(lote.estado, lote.tipoProducto)}
                     </span>
                   )}
                 </div>
@@ -344,7 +383,7 @@ function MezclarModal({ lote, onClose, onConfirm }: {
                 <p className="text-sm font-medium">Sin lotes disponibles para mezclar</p>
                 <p className="text-xs mt-1">
                 Se necesitan lotes con el mismo producto:{' '}
-                <strong>{lote.tipoProducto?.tipo} · {lote.tipoProducto?.subtipoEntrada.replace(/_/g, ' ')}</strong>
+                <strong>{lote.tipoProducto?.tipo} · {displaySubtipo(lote.estado, lote.tipoProducto)}</strong>
               </p>
               </div>
             ) : elegiblesFiltrados.length === 0 ? (
@@ -376,7 +415,7 @@ function MezclarModal({ lote, onClose, onConfirm }: {
                           <p className="text-sm font-semibold text-gray-800 truncate">{l.codigo}</p>
                           {l.tipoProducto && (
                             <span className="text-[0.55rem] font-semibold px-1.5 py-0.5 rounded-full bg-white border border-gray-200 text-gray-400 capitalize shrink-0">
-                              {l.tipoProducto.tipo} · {l.tipoProducto.subtipoEntrada.replace(/_/g, ' ')}
+                              {l.tipoProducto.tipo} · {displaySubtipo(l.estado, l.tipoProducto)}
                             </span>
                           )}
                         </div>
@@ -464,16 +503,17 @@ export function LoteDetallePage() {
     ]).then(([l, o, m]) => { setLote(l); setOrigenes(o); setMuestras(m.data); setLoading(false); });
   }, [id]);
 
-  async function handlePromover(codigoLf?: string) {
-    if (!lote) return;
+  async function handlePromover(codigoLf?: string): Promise<string> {
+    if (!lote) throw new Error('Sin lote');
     setAccionando(true);
     try {
       const lf = await lotesService.promoverALf(lote.id, { codigoLf });
-      setSuccess(`Lote Final ${lf.codigo} creado correctamente`);
       const [l, o] = await Promise.all([lotesService.getOne(lote.id), lotesService.getLotesFinalOrigen(lote.id)]);
       setLote(l); setOrigenes(o);
-    } catch (err) { throw err; }
-    finally { setAccionando(false); }
+      return lf.codigo;
+    } finally {
+      setAccionando(false);
+    }
   }
 
   async function handleDividir(divisiones: Array<{ codigoLf: string; cantidadKg: number }>) {
@@ -518,7 +558,7 @@ export function LoteDetallePage() {
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-gray-50 rounded-2xl p-5 grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
             {[
-              ['Tipo Producto', lote.tipoProducto ? `${lote.tipoProducto.tipo} (${lote.tipoProducto.subtipoEntrada})` : `#${lote.tipoProductoId}`],
+              ['Tipo Producto', lote.tipoProducto ? `${lote.tipoProducto.tipo} (${displaySubtipo(lote.estado, lote.tipoProducto)})` : `#${lote.tipoProductoId}`],
               ['Cantidad actual', `${Number(lote.cantidadKg).toFixed(2)} kg`],
               ['Sacos (ref.)', lote.cantidadSacos != null ? String(lote.cantidadSacos) : '—'],
               ['Productor', lote.productor ? `${lote.productor.nombre} ${lote.productor.apellido ?? ''}`.trim() : `#${lote.productorId}`],

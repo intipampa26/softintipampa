@@ -7,16 +7,22 @@ import { tiposProductoService, TipoProducto } from '@/services/tipos-producto.se
 import { campanasService, Campana } from '@/services/campanas.service';
 import { productoresService, Productor } from '@/services/productores.service';
 import { parcelasService, Parcela } from '@/services/parcelas.service';
-import { configuracionService } from '@/services/configuracion.service';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { TablePagination } from '@/components/TablePagination';
 import LoadingLogo from '@/components/LoadingLogo';
 
-const PLANTAS = ['CB Jaen', 'CB Lima', 'Kuska', 'Mego', 'Selva Norte'];
+const PLANTAS = ['CB Jaen','CB Lima','Expocafé','Kuska','Mego','Selva Norte','Aicasa','Norandino','Negrisa'];
 
-function parseVariedades(raw: string | null | undefined): string[] {
-  try { return JSON.parse(raw ?? '[]') ?? []; } catch { return []; }
+const POST_TRILLADO: LoteEstado[] = ['POST_TRILLADO', 'PREPARADO', 'EMBARCADO', 'EXPORTADO'];
+function subtipoCafe(estado: LoteEstado) { return POST_TRILLADO.includes(estado) ? 'Café Pergamino' : 'Café Oro Verde'; }
+function displaySubtipo(estado: LoteEstado, tp?: { tipo: string; subtipoEntrada: string }) {
+  if (!tp) return '';
+  return tp.tipo === 'CAFE' ? subtipoCafe(estado) : tp.subtipoEntrada.replace(/_/g, ' ');
 }
+
+const VARIEDADES_CAFE  = ['Caturra','Borbón Rojo','Borbon naranja','Gesha','Pacamara','Tabi','Sidra','Papayo','Blend','Pache','Costa Rica 95','Tipica','Catimor','Maragogipe','SL34','Villa Sarchí','Marsellesa','Limani'];
+const VARIEDADES_CACAO = ['Cacao','Macambo','Cupui','Copuazu','Manteca de cacao','Polvo de cacao','Nibs de cacao','Pasta de cacao'];
+const TODAS_VARIEDADES = [...VARIEDADES_CAFE, ...VARIEDADES_CACAO];
 
 function VariedadSelect({ value, onChange, variedades, placeholder = 'Sin variedad', className = '' }: {
   value: string | undefined; onChange: (v: string | undefined) => void;
@@ -71,10 +77,9 @@ const ESTADO_DOT: Record<LoteEstado, string> = {
   EXPORTADO:        'bg-indigo-600',
 };
 
-function LoteFormModal({ tiposProducto, campanas, variedades, onClose, onSave, initial }: {
+function LoteFormModal({ tiposProducto, campanas, onClose, onSave, initial }: {
   tiposProducto: TipoProducto[];
   campanas: Campana[];
-  variedades: string[];
   onClose: () => void;
   onSave: (dto: Partial<CreateLoteDto>) => Promise<void>;
   initial?: Lote;
@@ -100,6 +105,9 @@ function LoteFormModal({ tiposProducto, campanas, variedades, onClose, onSave, i
     const p = initial?.planta;
     return !!p && !PLANTAS.includes(p);
   });
+
+  const tipoProductoTipo = tiposProducto.find(t => t.id === form.tipoProductoId)?.tipo;
+  const variedadesPorTipo = tipoProductoTipo === 'CACAO' ? VARIEDADES_CACAO : VARIEDADES_CAFE;
 
   useEffect(() => {
     if (!form.campanaId) { setProductores([]); return; }
@@ -141,7 +149,7 @@ function LoteFormModal({ tiposProducto, campanas, variedades, onClose, onSave, i
               <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Tipo Producto *</label>
               <select value={form.tipoProductoId ?? ''} onChange={e => setForm(f => ({ ...f, tipoProductoId: e.target.value ? Number(e.target.value) : undefined }))} className={cls}>
                 <option value="">Seleccionar…</option>
-                {tiposProducto.map(t => <option key={t.id} value={t.id}>{t.tipo} ({t.subtipoEntrada})</option>)}
+                {tiposProducto.map(t => <option key={t.id} value={t.id}>{t.tipo} ({t.tipo === 'CAFE' ? 'Oro Verde' : t.subtipoEntrada.replace(/_/g,' ')})</option>)}
               </select>
             </div>
             <div>
@@ -205,7 +213,7 @@ function LoteFormModal({ tiposProducto, campanas, variedades, onClose, onSave, i
               <VariedadSelect
                 value={form.variedad}
                 onChange={(v) => setForm(f => ({ ...f, variedad: v }))}
-                variedades={variedades}
+                variedades={variedadesPorTipo}
                 placeholder="Sin variedad"
                 className={cls}
               />
@@ -279,7 +287,6 @@ export function LotesPage() {
 
   const [tiposProducto, setTiposProducto] = useState<TipoProducto[]>([]);
   const [campanas,      setCampanas]      = useState<Campana[]>([]);
-  const [variedades,    setVariedades]    = useState<string[]>([]);
 
   const [filterTipo,     setFilterTipo]     = useState('');
   const [filterEstado,   setFilterEstado]   = useState<LoteEstado | ''>('');
@@ -292,7 +299,6 @@ export function LotesPage() {
   useEffect(() => {
     tiposProductoService.getAll().then(setTiposProducto);
     campanasService.getPage(1, 100).then(r => setCampanas(r.data));
-    configuracionService.get().then(c => setVariedades(parseVariedades(c?.variedades)));
     productoresService.getPage(1, 200).then(r => setProductores(r.data));
   }, []);
 
@@ -370,14 +376,21 @@ export function LotesPage() {
                 {productores.map(p => <option key={p.id} value={p.id}>{p.nombre} {p.apellido ?? ''}</option>)}
               </select>
             </div>
-            <div className="w-full sm:w-36">
+            <div className="w-full sm:w-40">
               <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Variedad</label>
-              <input
+              <select
                 value={filterVariedad}
                 onChange={e => { setFilterVariedad(e.target.value); setPage(1); }}
                 className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Variedad…"
-              />
+              >
+                <option value="">Todas</option>
+                <optgroup label="Café">
+                  {VARIEDADES_CAFE.map(v => <option key={v} value={v}>{v}</option>)}
+                </optgroup>
+                <optgroup label="Cacao">
+                  {VARIEDADES_CACAO.map(v => <option key={v} value={v}>{v}</option>)}
+                </optgroup>
+              </select>
             </div>
             <div className="w-full sm:w-40">
               <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Planta</label>
@@ -433,7 +446,7 @@ export function LotesPage() {
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div>
                     <p className="font-bold text-gray-800 text-sm">{l.codigo}</p>
-                    {l.tipoProducto && <p className="text-xs text-gray-400 mt-0.5">{l.tipoProducto.tipo} · {l.tipoProducto.subtipoEntrada}</p>}
+                    {l.tipoProducto && <p className="text-xs text-gray-400 mt-0.5">{l.tipoProducto.tipo} · {displaySubtipo(l.estado, l.tipoProducto)}</p>}
                   </div>
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 shrink-0">
                     <span className={`w-2 h-2 rounded-full ${ESTADO_DOT[l.estado]}`}/>
@@ -466,7 +479,7 @@ export function LotesPage() {
                     <tr key={l.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate(`/dashboard/lotes/${l.id}`)}>
                       <td className="px-5 py-4">
                         <p className="font-semibold text-gray-800">{l.codigo}</p>
-                        {l.tipoProducto && <p className="text-xs text-gray-400">{l.tipoProducto.subtipoEntrada}</p>}
+                        {l.tipoProducto && <p className="text-xs text-gray-400">{displaySubtipo(l.estado, l.tipoProducto)}</p>}
                       </td>
                       <td className="px-5 py-4 text-xs font-bold text-gray-600">{l.tipoProducto?.tipo ?? `#${l.tipoProductoId}`}</td>
                       <td className="px-5 py-4 text-xs text-gray-500">{l.variedad || '—'}</td>
@@ -504,10 +517,10 @@ export function LotesPage() {
       </div>
 
       {modal === 'create' && (
-        <LoteFormModal tiposProducto={tiposProducto} campanas={campanas} variedades={variedades} onClose={() => setModal(null)} onSave={handleCreate} />
+        <LoteFormModal tiposProducto={tiposProducto} campanas={campanas} onClose={() => setModal(null)} onSave={handleCreate} />
       )}
       {modal === 'edit' && selected && (
-        <LoteFormModal tiposProducto={tiposProducto} campanas={campanas} variedades={variedades} onClose={() => { setModal(null); setSelected(null); }} onSave={handleEdit} initial={selected} />
+        <LoteFormModal tiposProducto={tiposProducto} campanas={campanas} onClose={() => { setModal(null); setSelected(null); }} onSave={handleEdit} initial={selected} />
       )}
       {modal === 'delete' && selected && (
         <DeleteConfirm lote={selected} onClose={() => setModal(null)} onConfirm={handleDelete} />

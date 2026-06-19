@@ -25,7 +25,7 @@ export interface UpdateUsuarioDto {
 }
 
 const CACHE_KEY = 'collective_bean_usuarios_cache';
-const BASE = '/api/users';
+const BASE = '/users';
 
 function readCache(): Usuario[] {
   try {

@@ -55,6 +55,18 @@ export class KardexService {
     return this.repo.save(mov);
   }
 
+  async netSalidaPorReferencia(
+    referenciaTipo: ReferenciaTipoKardex,
+    referenciaId:   number,
+    loteFinalId:    number,
+  ): Promise<number> {
+    const movs = await this.repo.find({ where: { referenciaTipo, referenciaId, loteFinalId } });
+    return movs.reduce((acc, m) => {
+      const qty = Number(m.cantidadKg);
+      return m.tipoMovimiento === TipoMovimientoKardex.SALIDA ? acc + qty : acc - qty;
+    }, 0);
+  }
+
   findByLoteFinal(loteFinalId: number): Promise<MovimientoKardex[]> {
     return this.repo.find({
       where: { loteFinalId },

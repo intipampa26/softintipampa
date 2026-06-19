@@ -43,7 +43,7 @@ export interface PagedMermas {
   meta: { total: number; page: number; lastPage: number; limit: number };
 }
 
-const BASE = '/api/mermas';
+const BASE = '/mermas';
 
 export const mermasService = {
   async getPage(filter: {

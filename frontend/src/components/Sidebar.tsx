@@ -74,6 +74,14 @@ const IconReportes = () => (
   </svg>
 );
 
+const IconIndicadores = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+    <rect x="2" y="2" width="20" height="20" rx="3"/>
+    <polyline points="7 17 10 12 13 14 17 8"/>
+    <circle cx="17" cy="8" r="1.5" fill="currentColor" stroke="none"/>
+  </svg>
+);
+
 const IconConfiguracion = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
     <circle cx="12" cy="12" r="3"/>

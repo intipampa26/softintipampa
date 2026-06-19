@@ -301,8 +301,26 @@ export function ParcelaCampanaForm({
         </div>
         <div>
           <label className={labelCls}>Variedades de café</label>
-          <input className={inputCls} placeholder="Caturra, Bourbon, Gesha…"
-            value={strV(fields.variedadesCafe)} onChange={strF('variedadesCafe')} />
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-1">
+            {['Caturra','Borbón Rojo','Borbon naranja','Gesha','Pacamara','Tabi','Sidra','Papayo','Blend','Pache','Costa Rica 95','Tipica','Catimor','Maragogipe','SL34','Villa Sarchí','Marsellesa','Limani'].map(v => {
+              const selected = (fields.variedadesCafe ?? '').split(',').map(s => s.trim()).filter(Boolean);
+              const checked  = selected.includes(v);
+              return (
+                <label key={v} className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const next = checked ? selected.filter(s => s !== v) : [...selected, v];
+                      setF('variedadesCafe', next.join(', ') || null);
+                    }}
+                    className="accent-blue-600 w-3.5 h-3.5 shrink-0"
+                  />
+                  <span className="text-xs text-gray-700">{v}</span>
+                </label>
+              );
+            })}
+          </div>
         </div>
         <div>
           <label className={labelCls}>Tipo de árboles (sombra/bosque)</label>

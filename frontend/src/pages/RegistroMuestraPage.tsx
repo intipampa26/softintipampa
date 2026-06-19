@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+
+const VARIEDADES_CACAO = ['Cacao','Macambo','Cupui','Copuazu','Manteca de cacao','Polvo de cacao','Nibs de cacao','Pasta de cacao'];
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -286,7 +288,10 @@ export function RegistroMuestraPage() {
             </div>
             <div>
               <label className={LABEL}>Variedad</label>
-              <input {...register('variedad')} className={FIELD} placeholder="Ej: CCN-51 / Nacional" />
+              <select {...register('variedad')} className={FIELD}>
+                <option value="">Seleccionar…</option>
+                {VARIEDADES_CACAO.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
             </div>
             <div>
               <label className={LABEL}>Fecha Cosecha</label>

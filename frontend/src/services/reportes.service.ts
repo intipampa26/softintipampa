@@ -15,7 +15,7 @@ export interface ResumenReporte {
   kpis:    ResumenKpis;
 }
 
-const BASE = '/api/reportes';
+const BASE = '/reportes';
 
 export const reportesService = {
   async getResumen(campanaId?: number): Promise<ResumenReporte> {

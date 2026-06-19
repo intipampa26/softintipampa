@@ -46,7 +46,7 @@ export interface UploadEvidenciaDto {
 }
 
 const cacheKey  = (pid: number) => `intipampa_evidencias_${pid}`;
-const BASE      = '/api/evidencias';
+const BASE      = '/evidencias';
 
 function readCache(productorId: number): Evidencia[] {
   try {

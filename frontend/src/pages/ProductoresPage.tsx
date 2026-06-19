@@ -1104,7 +1104,9 @@ const SYNC_BADGE = {
 export function ProductoresPage() {
   const navigate = useNavigate();
   const { isOffline, justReconnected } = useNetworkStatus();
-  const { campanas, campanaActiva, setCampanaActiva } = useCampana();
+  const { campanas, campanaActiva, setCampanaActiva, refresh: refreshCampanas } = useCampana();
+
+  useEffect(() => { refreshCampanas(); }, [refreshCampanas]);
 
   const [productores, setProductores] = useState<Productor[]>([]);
   const [meta, setMeta] = useState<PaginationMeta>({ total: 0, page: 1, lastPage: 1, limit: 10 });

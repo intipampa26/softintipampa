@@ -28,6 +28,7 @@ export function AlistadoCompromisoVentaModal({ orden, onClose, onGoToStep }: Pro
   const [fechaContrato, setFechaContrato] = useState('');
   const [comprador,     setComprador]     = useState(orden.cliente ?? '');
   const [precioUsd,     setPrecioUsd]     = useState('');
+  const [moneda,        setMoneda]        = useState<'USD' | 'PEN'>('USD');
   const [cantidadKg,    setCantidadKg]    = useState('');
   const [incoterm,      setIncoterm]      = useState('');
   const [condPago,      setCondPago]      = useState('');
@@ -35,6 +36,7 @@ export function AlistadoCompromisoVentaModal({ orden, onClose, onGoToStep }: Pro
   const [notas,         setNotas]         = useState('');
 
   const total = precioUsd && cantidadKg ? parseFloat(precioUsd) * parseFloat(cantidadKg) : 0;
+  const monedaSymbol = moneda === 'PEN' ? 'S/.' : 'USD';
 
   return (
     <div
@@ -83,8 +85,20 @@ export function AlistadoCompromisoVentaModal({ orden, onClose, onGoToStep }: Pro
               <input value={comprador} onChange={e => setComprador(e.target.value)} className={INP} style={inpStyle} placeholder="Razón social…" />
             </div>
             <div>
-              {fieldLabel('Precio acordado (USD / kg)')}
-              <input type="number" min={0} step="0.01" value={precioUsd} onChange={e => setPrecioUsd(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+              {fieldLabel(`Precio acordado (${moneda} / kg)`)}
+              <div className="flex gap-2">
+                <div className="flex rounded-xl overflow-hidden border shrink-0" style={{ borderColor: BD }}>
+                  {(['USD', 'PEN'] as const).map(m => (
+                    <button key={m} type="button"
+                      onClick={() => setMoneda(m)}
+                      className="px-3 py-2 text-xs font-bold transition-colors"
+                      style={{ backgroundColor: moneda === m ? CP : '#fff', color: moneda === m ? '#fff' : '#6B7280' }}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                <input type="number" min={0} step="0.01" value={precioUsd} onChange={e => setPrecioUsd(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+              </div>
             </div>
             <div>
               {fieldLabel('Cantidad comprometida (kg)')}
@@ -122,7 +136,7 @@ export function AlistadoCompromisoVentaModal({ orden, onClose, onGoToStep }: Pro
           {total > 0 && (
             <div className="rounded-xl px-4 py-3 flex items-center gap-3" style={{ backgroundColor: `${CP}12` }}>
               <p className="text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: CP }}>Total comprometido:</p>
-              <p className="font-black text-base" style={{ color: CP }}>USD {total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+              <p className="font-black text-base" style={{ color: CP }}>{monedaSymbol} {total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
             </div>
           )}
 

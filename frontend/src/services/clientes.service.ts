@@ -40,7 +40,7 @@ export interface PagedResult {
 }
 
 const CACHE_KEY = 'collective_bean_clientes_cache';
-const BASE      = '/api/clientes';
+const BASE      = '/clientes';
 
 function readCache(): Cliente[] {
   try {

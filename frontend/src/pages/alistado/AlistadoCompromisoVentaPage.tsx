@@ -33,11 +33,14 @@ export function AlistadoCompromisoVentaPage() {
   const [fechaContrato,setFechaContrato]= useState('');
   const [comprador,    setComprador]    = useState('');
   const [precioUsd,    setPrecioUsd]    = useState('');
+  const [moneda,       setMoneda]       = useState<'USD' | 'PEN'>('USD');
   const [cantidadKg,   setCantidadKg]   = useState('');
   const [incoterm,     setIncoterm]     = useState('');
   const [condPago,     setCondPago]     = useState('');
   const [fechaEntrega, setFechaEntrega] = useState('');
   const [notas,        setNotas]        = useState('');
+
+  const monedaSymbol = moneda === 'PEN' ? 'S/.' : 'USD';
 
   return (
     <div className="min-h-full flex flex-col" style={{ backgroundColor: BG }}>
@@ -64,8 +67,20 @@ export function AlistadoCompromisoVentaPage() {
             {field('Comprador / Cliente',
               <input value={comprador} onChange={e => setComprador(e.target.value)} className={INP} style={inpStyle} placeholder="Razón social del comprador…" />
             )}
-            {field('Precio acordado (USD / kg)',
-              <input type="number" min={0} step="0.01" value={precioUsd} onChange={e => setPrecioUsd(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+            {field(`Precio acordado (${moneda} / kg)`,
+              <div className="flex gap-2">
+                <div className="flex rounded-xl overflow-hidden border shrink-0" style={{ borderColor: BD }}>
+                  {(['USD', 'PEN'] as const).map(m => (
+                    <button key={m} type="button"
+                      onClick={() => setMoneda(m)}
+                      className="px-3 py-2 text-xs font-bold transition-colors"
+                      style={{ backgroundColor: moneda === m ? CP : '#fff', color: moneda === m ? '#fff' : '#6B7280' }}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                <input type="number" min={0} step="0.01" value={precioUsd} onChange={e => setPrecioUsd(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+              </div>
             )}
             {field('Cantidad comprometida (kg)',
               <input type="number" min={0} value={cantidadKg} onChange={e => setCantidadKg(e.target.value)} className={INP} style={inpStyle} placeholder="0" />
@@ -101,7 +116,7 @@ export function AlistadoCompromisoVentaPage() {
             <div className="rounded-xl px-4 py-3 flex items-center gap-3" style={{ backgroundColor: `${CP}12` }}>
               <p className="text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: CP }}>Total comprometido:</p>
               <p className="font-black text-base" style={{ color: CP }}>
-                USD {(parseFloat(precioUsd) * parseFloat(cantidadKg)).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
+                {monedaSymbol} {(parseFloat(precioUsd) * parseFloat(cantidadKg)).toLocaleString('es-PE', { minimumFractionDigits: 2 })}
               </p>
             </div>
           )}
