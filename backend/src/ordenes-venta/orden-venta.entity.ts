@@ -45,7 +45,7 @@ export class OrdenVenta {
   @Column({ length: 200 })
   cliente: string;
 
-  @Column({ length: 200 })
+  @Column({ length: 200, default: '' })
   productor: string;
 
   @Column({ length: 100, nullable: true })
@@ -65,6 +65,12 @@ export class OrdenVenta {
 
   @Column({ type: 'decimal', precision: 14, scale: 2, default: 0 })
   montoUSD: number;
+
+  @Column({ length: 5, default: 'USD' })
+  moneda: string;
+
+  @Column({ length: 50, nullable: true, default: 'NACIONAL' })
+  mercado: string | null;
 
   @Column({ type: 'date', nullable: true })
   fecha: string | null;

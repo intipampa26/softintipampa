@@ -131,7 +131,7 @@ export const evidenciasService = {
    
   async download(ev: Evidencia): Promise<void> {
     if (!navigator.onLine) {
-      alert('Descarga no disponible en modo offline.');
+      window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'offline', message: 'Descarga no disponible en modo offline.' } }));
       return;
     }
     const token = storageService.getAccessToken();

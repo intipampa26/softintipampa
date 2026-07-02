@@ -5,6 +5,7 @@ import { productoresService, Productor } from '@/services/productores.service';
 import { syncService } from '@/services/sync.service';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import LoadingLogo from '@/components/LoadingLogo';
+import { useToast } from '@/contexts/ToastContext';
 
 function codigoProductor(p: Productor) {
   return `PR${String(p.id).padStart(3, '0')}`;
@@ -79,6 +80,7 @@ export function EvidenciasFamiliaresPage() {
   const { productorId } = useParams<{ productorId: string }>();
   const navigate        = useNavigate();
   const { isOffline, justReconnected } = useNetworkStatus();
+  const toast = useToast();
   const pid = Number(productorId);
 
   const [productor,   setProductor]   = useState<Productor | null>(null);
@@ -165,7 +167,7 @@ export function EvidenciasFamiliaresPage() {
 
   async function handleDownload(ev: EvidenciaFamiliar) {
     try { await evidenciasFamiliaresService.download(ev); }
-    catch { alert('No se pudo descargar el archivo.'); }
+    catch { toast.error('No se pudo descargar el archivo.'); }
   }
 
   

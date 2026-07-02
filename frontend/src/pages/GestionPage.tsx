@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import LoadingLogo from '../components/LoadingLogo';
+import { useToast } from '@/contexts/ToastContext';
 import {
   Search, Plus, Pencil, Trash2, Package, Ship, FileText,
   ChevronRight, X, Calendar, User, Hash,
@@ -11,10 +12,8 @@ import { AlistadoModal }        from '../components/AlistadoModal';
 import { ExportacionModal } from '../components/ExportacionModal';
 import { PostVentaModal }  from '../components/PostVentaModal';
 import { clientesService, Cliente }     from '../services/clientes.service';
-import { lotesFinalesService, LoteFinal } from '../services/lotes-finales.service';
-import { lotesService }                   from '../services/lotes.service';
 import { campanasService, Campana }      from '../services/campanas.service';
-import { ordenesVentaService, mapEstadoToEtapa } from '../services/ordenes-venta.service';
+import { ordenesVentaService, mapEstadoToEtapa, OrdenPasoFE } from '../services/ordenes-venta.service';
 
 const CP  = '#445D46';
 const CS  = '#5F7A61';
@@ -39,6 +38,7 @@ interface OrdenVenta {
   destino:      string;
   tipoProducto: string;
   montoUSD:     number;
+  moneda:       string;
 }
 
 interface PasoTimeline {
@@ -81,11 +81,12 @@ function FlowProgress({ estado, onStageClick }: { estado: EstadoOrden; onStageCl
                   onClick={e => { e.stopPropagation(); if (clickable) onStageClick?.(step.key); }}
                   className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-all ${clickable ? 'hover:scale-125 cursor-pointer' : 'cursor-default'}`}
                   style={{
-                    backgroundColor: done ? CP : active ? CP : '#E5E7EB',
-                    border:     active ? `2px solid ${CP}` : done ? 'none' : '2px solid #D1D5DB',
+                    backgroundColor: done ? CP : active ? CP : 'transparent',
+                    border:     active ? `2px solid ${CP}` : done ? 'none' : `2px solid ${CP}`,
                     boxShadow:  active ? `0 0 0 3px ${CP}25` : 'none',
+                    opacity:    pending ? 0.45 : 1,
                   }}
-                  title={clickable ? `Ver ${step.label}` : undefined}
+                  title={`Ver ${step.label}`}
                 >
                   {done && (
                     <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
@@ -96,13 +97,13 @@ function FlowProgress({ estado, onStageClick }: { estado: EstadoOrden; onStageCl
                 </button>
                 <span
                   className="text-[0.5rem] font-semibold mt-1 text-center leading-tight truncate w-full"
-                  style={{ color: pending ? '#9CA3AF' : CP }}
+                  style={{ color: CP, opacity: pending ? 0.5 : 1 }}
                 >
                   {step.short}
                 </span>
               </div>
               {i < FLOW_STEPS.length - 1 && (
-                <div className="h-px flex-1 mx-0.5 mb-3" style={{ backgroundColor: done ? CP : '#E5E7EB' }} />
+                <div className="h-px flex-1 mx-0.5 mb-3" style={{ backgroundColor: done ? CP : `${CP}30` }} />
               )}
             </div>
           );
@@ -112,29 +113,15 @@ function FlowProgress({ estado, onStageClick }: { estado: EstadoOrden; onStageCl
   );
 }
 
-const PASOS = [
-  'Registrado', 'Por subir documento', 'Recepcionado',
-  'Verificado', 'Convalidado', 'Procesado', 'Pagado', 'Resolución',
-];
-
-const RESPONSABLES = ['ops.garcia', 'ops.quispe', 'supervisor', 'adm.torres', 'aduanas.peru'];
-const HORAS = ['08:15', '09:30', '10:45', '11:00', '13:20', '14:35', '15:50', '16:10'];
-const FECHAS_BASE = [
-  '03/01/2026','06/01/2026','09/01/2026','12/01/2026',
-  '15/01/2026','20/01/2026','24/01/2026','28/01/2026',
-];
-
-function buildTimeline(completados: number): PasoTimeline[] {
-  return PASOS.map((label, i) => ({
-    label,
-    fecha:       i < completados ? FECHAS_BASE[i] : i === completados ? FECHAS_BASE[i] ?? '' : '',
-    hora:        i <= completados ? HORAS[i] : '',
-    responsable: i <= completados ? RESPONSABLES[i % RESPONSABLES.length] : '',
-    estado:      i < completados ? 'completado' : i === completados ? 'en_proceso' : 'pendiente',
-  }));
+function pasoToTimeline(p: OrdenPasoFE): PasoTimeline {
+  return {
+    label:       p.label,
+    fecha:       p.fecha ?? '',
+    hora:        '',
+    responsable: p.usuario ?? '',
+    estado:      p.estado,
+  };
 }
-
-const TIMELINES: Record<string, PasoTimeline[]> = {};
 
 const INP = `w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 transition-all duration-200`;
 const inpStyle = { borderColor: BD, color: TX };
@@ -233,7 +220,7 @@ function OrderCard({ orden, active, onSelect, onEdit, onDelete, onFlow, onStageC
         <div className="flex items-center gap-2">
           <MapPin size={10} style={{ color: CL }} />
           <span className="text-[0.62rem] text-gray-400">{orden.destino}</span>
-          <span className="ml-auto text-[0.62rem] font-semibold text-emerald-600">USD {orden.montoUSD.toLocaleString()}</span>
+          <span className="ml-auto text-[0.62rem] font-semibold text-emerald-600">{orden.moneda ?? 'USD'} {orden.montoUSD.toLocaleString()}</span>
         </div>
       </div>
 
@@ -365,9 +352,22 @@ function TimelineStep({ paso, index, isLast }: { paso: PasoTimeline; index: numb
 }
 
 function ProcessTimelineModal({ orden, onClose }: { orden: OrdenVenta; onClose: () => void }) {
-  const timeline    = TIMELINES[orden.id] ?? buildTimeline(0);
+  const [timeline,   setTimeline]   = useState<PasoTimeline[]>([]);
+  const [loadingTL,  setLoadingTL]  = useState(true);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    setLoadingTL(true);
+    ordenesVentaService.getPasos(orden.dbId)
+      .then(pasos => { if (mountedRef.current) setTimeline(pasos.map(pasoToTimeline)); })
+      .catch(() => {})
+      .finally(() => { if (mountedRef.current) setLoadingTL(false); });
+    return () => { mountedRef.current = false; };
+  }, [orden.dbId]);
+
   const completadas = timeline.filter(p => p.estado === 'completado').length;
-  const pct         = Math.round((completadas / timeline.length) * 100);
+  const pct         = timeline.length ? Math.round((completadas / timeline.length) * 100) : 0;
 
   return (
     <div
@@ -420,13 +420,19 @@ function ProcessTimelineModal({ orden, onClose }: { orden: OrdenVenta; onClose: 
           </div>
         </div>
 
-        
+
         <div className="overflow-x-auto px-5 py-6">
-          <div className="flex gap-2 min-w-max">
-            {timeline.map((paso, i) => (
-              <TimelineStep key={paso.label} paso={paso} index={i} isLast={i === timeline.length - 1} />
-            ))}
-          </div>
+          {loadingTL ? (
+            <div className="flex items-center justify-center py-10"><LoadingLogo compact /></div>
+          ) : timeline.length === 0 ? (
+            <p className="text-center text-xs text-gray-400 py-10">Sin pasos registrados</p>
+          ) : (
+            <div className="flex gap-2 min-w-max">
+              {timeline.map((paso, i) => (
+                <TimelineStep key={paso.label + i} paso={paso} index={i} isLast={i === timeline.length - 1} />
+              ))}
+            </div>
+          )}
         </div>
 
         
@@ -453,89 +459,34 @@ function ProcessTimelineModal({ orden, onClose }: { orden: OrdenVenta; onClose: 
 
 interface ModalProps { initial?: OrdenVenta | null; onClose: () => void; onSave: (d: Partial<OrdenVenta>) => Promise<void>; }
 
-interface ProductorOption { id: number; nombre: string; display: string; }
-
 function OrderModal({ initial, onClose, onSave }: ModalProps) {
   const [form, setForm] = useState({
     cliente:      initial?.cliente      ?? '',
-    productor:    initial?.productor    ?? '',
     campana:      initial?.campana      ?? '',
     fecha:        initial?.fecha        ?? '',
-    lote:         initial?.lote         ?? '',
     cantidadKg:   initial?.cantidadKg   ?? 0,
     destino:      initial?.destino      ?? '',
-    tipoProducto: initial?.tipoProducto ?? '',
     montoUSD:     initial?.montoUSD     ?? 0,
+    moneda:       (initial?.moneda      ?? 'USD') as 'USD' | 'PEN',
     estado:       (initial?.estado      ?? 'pre_venta') as EstadoOrden,
   });
   const [clientes,          setClientes]          = useState<Cliente[]>([]);
   const [campanas,          setCampanas]          = useState<Campana[]>([]);
-  const [productores,       setProductores]       = useState<ProductorOption[]>([]);
-  const [lotes,             setLotes]             = useState<LoteFinal[]>([]);
   const [selectedCampanaId, setSelectedCampanaId] = useState<number | null>(null);
-  const [selectedProductorId, setSelectedProductorId] = useState<number | null>(null);
-  const [loadingProds,      setLoadingProds]      = useState(false);
-  const [loadingLotes,      setLoadingLotes]      = useState(false);
-  const [moneda,            setMoneda]            = useState<'USD' | 'PEN'>('USD');
-  const [loteCantidad,      setLoteCantidad]      = useState<number | null>(null);
-  const [venderTodo,        setVenderTodo]        = useState(false);
   const [saving,            setSaving]            = useState(false);
-  const [error,             setError]             = useState('');
+  const toast = useToast();
 
   useEffect(() => {
     clientesService.getPage(1, 200).then(r => setClientes(r.data));
     campanasService.getPage(1, 200).then(r => setCampanas(r.data));
   }, []);
 
-  const handleCampanaChange = useCallback(async (campanaId: number, campanaNombre: string) => {
-    setSelectedCampanaId(campanaId);
-    setSelectedProductorId(null);
-    setProductores([]);
-    setLotes([]);
-    setLoteCantidad(null);
-    setForm(f => ({ ...f, campana: campanaNombre, productor: '', lote: '', tipoProducto: '' }));
-    if (!campanaId) return;
-    setLoadingProds(true);
-    try {
-      const res = await lotesService.getPage({ campanaId, limit: 500 });
-      const seen = new Set<number>();
-      const opts: ProductorOption[] = [];
-      for (const l of res.data) {
-        if (l.productorId && !seen.has(l.productorId)) {
-          seen.add(l.productorId);
-          const nombre = l.productor
-            ? `${l.productor.nombre}${l.productor.apellido ? ' ' + l.productor.apellido : ''}`.trim()
-            : `Productor #${l.productorId}`;
-          opts.push({ id: l.productorId, nombre, display: nombre });
-        }
-      }
-      setProductores(opts);
-    } finally {
-      setLoadingProds(false);
-    }
-  }, []);
-
-  const handleProductorChange = useCallback(async (productorId: number, productorNombre: string) => {
-    setSelectedProductorId(productorId);
-    setLotes([]);
-    setLoteCantidad(null);
-    setForm(f => ({ ...f, productor: productorNombre, lote: '', tipoProducto: '' }));
-    if (!productorId || !selectedCampanaId) return;
-    setLoadingLotes(true);
-    try {
-      const res = await lotesFinalesService.getPage({ campanaId: selectedCampanaId, productorId, limit: 500 });
-      setLotes(res.data);
-    } finally {
-      setLoadingLotes(false);
-    }
-  }, [selectedCampanaId]);
-
   const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = useCallback(async () => {
-    setSaving(true); setError('');
+    setSaving(true);
     try { await onSave(form); onClose(); }
-    catch (e: any) { setError(e?.response?.data?.message ?? 'Error al guardar'); }
+    catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al guardar'); }
     finally { setSaving(false); }
   }, [form, onSave, onClose]);
 
@@ -560,7 +511,6 @@ function OrderModal({ initial, onClose, onSave }: ModalProps) {
             <p className="text-sm font-semibold text-gray-600 mt-3">Guardando…</p>
           </div>
         )}
-        {error && <p className="mx-6 mt-4 text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
 
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0" style={{ borderColor: BG }}>
           <div>
@@ -589,7 +539,8 @@ function OrderModal({ initial, onClose, onSave }: ModalProps) {
                 onChange={e => {
                   const id = Number(e.target.value);
                   const c  = campanas.find(x => x.id === id);
-                  handleCampanaChange(id, c?.nombre ?? '');
+                  setSelectedCampanaId(id);
+                  setForm(f => ({ ...f, campana: c?.nombre ?? '' }));
                 }}
                 className={inputCls}
                 style={inpStyle}
@@ -598,114 +549,7 @@ function OrderModal({ initial, onClose, onSave }: ModalProps) {
                 {campanas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
               </select>
             ))}
-            {field('Productor', (
-              <select
-                value={selectedProductorId ?? ''}
-                onChange={e => {
-                  const id = Number(e.target.value);
-                  const p  = productores.find(x => x.id === id);
-                  handleProductorChange(id, p?.display ?? '');
-                }}
-                className={inputCls}
-                style={inpStyle}
-                disabled={!selectedCampanaId || loadingProds}
-              >
-                <option value="">{loadingProds ? 'Cargando…' : selectedCampanaId ? 'Seleccionar…' : 'Elige una campaña primero'}</option>
-                {productores.map(p => <option key={p.id} value={p.id}>{p.display}</option>)}
-              </select>
-            ))}
             {field('Fecha', <input type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} className={inputCls} style={inpStyle} />)}
-            {field('Lote', (
-              <div className="space-y-1.5">
-                <select
-                  value={form.lote}
-                  onChange={e => {
-                    const codigo = e.target.value;
-                    const lf = lotes.find(l => l.codigo === codigo);
-                    const newKg = lf?.cantidadKg ?? null;
-                    setLoteCantidad(newKg ? Number(newKg) : null);
-                    if (lf?.tipoProducto) {
-                      const t    = lf.tipoProducto;
-                      const tipo = t.tipo.charAt(0).toUpperCase() + t.tipo.slice(1).toLowerCase();
-                      const sub  = t.subtipoSalida ? ' ' + t.subtipoSalida.charAt(0).toUpperCase() + t.subtipoSalida.slice(1).toLowerCase() : '';
-                      setForm(f => ({ ...f, lote: codigo, tipoProducto: (tipo + sub).trim(), ...(venderTodo && newKg !== null ? { cantidadKg: Number(newKg) } : {}) }));
-                    } else {
-                      setForm(f => ({ ...f, lote: codigo, ...(venderTodo && newKg !== null ? { cantidadKg: Number(newKg) } : {}) }));
-                    }
-                  }}
-                  className={inputCls}
-                  style={inpStyle}
-                  disabled={!selectedProductorId || loadingLotes}
-                >
-                  <option value="">{loadingLotes ? 'Cargando…' : selectedProductorId ? (lotes.length === 0 ? 'Sin lotes disponibles' : 'Seleccionar…') : 'Elige un productor primero'}</option>
-                  {lotes.map(l => <option key={l.id} value={l.codigo}>{l.codigo}{l.tipoProducto ? ` · ${l.tipoProducto.tipo}` : ''}</option>)}
-                </select>
-                {loteCantidad !== null && (
-                  <p className="text-[0.62rem] font-medium" style={{ color: '#6B7280' }}>
-                    Disponible en lote: <strong style={{ color: TX }}>{loteCantidad.toLocaleString()} kg</strong>
-                  </p>
-                )}
-              </div>
-            ))}
-            {field('Tipo de producto', (
-              <div className="relative">
-                <input
-                  value={form.tipoProducto}
-                  onChange={e => set('tipoProducto', e.target.value)}
-                  className={inputCls}
-                  style={inpStyle}
-                  placeholder="Auto desde lote o escribe…"
-                />
-                {form.lote && form.tipoProducto && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[0.55rem] font-bold px-1.5 py-0.5 rounded" style={{ background: '#D1FAE5', color: '#065F46' }}>auto</span>
-                )}
-              </div>
-            ))}
-            {field('Cantidad (kg)', (
-              <div className="space-y-1.5">
-                {loteCantidad !== null && (
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={venderTodo}
-                      onChange={e => {
-                        const checked = e.target.checked;
-                        setVenderTodo(checked);
-                        if (checked && loteCantidad !== null) set('cantidadKg', loteCantidad);
-                      }}
-                      className="rounded border-gray-300 accent-green-700 w-3.5 h-3.5"
-                    />
-                    <span className="text-[0.62rem] font-semibold" style={{ color: TX }}>Vender todo el lote ({loteCantidad.toLocaleString()} kg)</span>
-                  </label>
-                )}
-                <input
-                  type="number"
-                  min={0}
-                  max={loteCantidad ?? undefined}
-                  value={form.cantidadKg}
-                  onChange={e => { setVenderTodo(false); set('cantidadKg', Number(e.target.value)); }}
-                  className={inputCls}
-                  style={inpStyle}
-                  disabled={venderTodo}
-                />
-                {loteCantidad !== null && form.cantidadKg > loteCantidad && (
-                  <p className="text-[0.6rem] text-red-600 font-medium">Supera los {loteCantidad.toLocaleString()} kg disponibles</p>
-                )}
-              </div>
-            ))}
-            {field('Monto', (
-              <input type="number" min={0} value={form.montoUSD} onChange={e => set('montoUSD', Number(e.target.value))} className={inputCls} style={inpStyle} />
-            ), (
-              <div className="flex rounded-lg overflow-hidden border text-[0.6rem] font-bold" style={{ borderColor: BD }}>
-                {(['USD', 'PEN'] as const).map(m => (
-                  <button key={m} type="button" onClick={() => setMoneda(m)}
-                    className="px-2 py-0.5 transition-colors"
-                    style={{ backgroundColor: moneda === m ? CP : 'transparent', color: moneda === m ? '#fff' : TX }}>
-                    {m}
-                  </button>
-                ))}
-              </div>
-            ))}
             {field('Destino', <input value={form.destino} onChange={e => set('destino', e.target.value)} className={inputCls} style={inpStyle} placeholder="País destino…" />)}
             {field('Estado', (
               <select value={form.estado} onChange={e => set('estado', e.target.value as EstadoOrden)} className={inputCls} style={inpStyle}>
@@ -851,9 +695,8 @@ export function GestionPage() {
 
   const ITEMS_PER_PAGE = 6;
 
-  useEffect(() => {
-    loadOrdenes();
-  }, []);
+  useEffect(() => { loadOrdenes(); }, []);
+  useEffect(() => { setPage(1); }, [filtroCampana, filtroProductor, filtroLote, filtroFecha]);
 
   async function loadOrdenes() {
     setLoading(true);
@@ -866,14 +709,14 @@ export function GestionPage() {
   }
 
   const displayed = useMemo(() => {
-    setPage(1);
     return ordenes.filter(o => {
-      if (filtroCampana   && o.campana   !== filtroCampana)                                   return false;
-      if (filtroProductor && o.productor !== filtroProductor)                                 return false;
-      if (filtroLote      && !o.lote.toLowerCase().includes(filtroLote.toLowerCase()))        return false;
+      if (filtroCampana   && o.campana   !== filtroCampana)                                             return false;
+      if (filtroProductor && o.productor !== filtroProductor)                                           return false;
+      if (filtroLote      && !(o.lote?.toLowerCase() ?? '').includes(filtroLote.toLowerCase()))         return false;
+      if (filtroFecha     && o.fecha !== filtroFecha)                                                   return false;
       return true;
     });
-  }, [ordenes, filtroCampana, filtroProductor, filtroLote]);
+  }, [ordenes, filtroCampana, filtroProductor, filtroLote, filtroFecha]);
 
   const totalPages = Math.max(1, Math.ceil(displayed.length / ITEMS_PER_PAGE));
   const paginated  = displayed.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
@@ -889,14 +732,13 @@ export function GestionPage() {
     if (modal === 'edit' && selected) {
       const updated = await ordenesVentaService.update(selected.dbId, {
         cliente:      data.cliente,
-        productor:    data.productor,
         campana:      data.campana,
         fecha:        data.fecha,
-        lote:         data.lote,
         cantidadKg:   data.cantidadKg,
         destino:      data.destino,
         tipoProducto: data.tipoProducto,
         montoUSD:     data.montoUSD,
+        moneda:       data.moneda,
         etapaActual:  data.estado ? mapEstadoToEtapa(data.estado) : undefined,
       });
       const mapped = updated as OrdenVenta;
@@ -905,14 +747,13 @@ export function GestionPage() {
     } else {
       const created = await ordenesVentaService.create({
         cliente:      data.cliente      ?? '',
-        productor:    data.productor    ?? '',
         campana:      data.campana,
         fecha:        data.fecha,
-        lote:         data.lote,
         cantidadKg:   data.cantidadKg   ?? 0,
         destino:      data.destino,
         tipoProducto: data.tipoProducto,
         montoUSD:     data.montoUSD     ?? 0,
+        moneda:       data.moneda       ?? 'USD',
         etapaActual:  data.estado ? mapEstadoToEtapa(data.estado) : 'preventa',
       });
       const mapped = created as OrdenVenta;
@@ -935,7 +776,8 @@ export function GestionPage() {
 
   
   const totalKg  = ordenes.reduce((s, o) => s + o.cantidadKg, 0);
-  const totalUSD = ordenes.reduce((s, o) => s + o.montoUSD, 0);
+  const totalUSD = ordenes.filter(o => (o.moneda ?? 'USD') === 'USD').reduce((s, o) => s + o.montoUSD, 0);
+  const totalPEN = ordenes.filter(o => o.moneda === 'PEN').reduce((s, o) => s + o.montoUSD, 0);
   const counts   = Object.fromEntries(
     (Object.keys(ESTADO_CFG) as EstadoOrden[]).map(k => [k, ordenes.filter(o => o.estado === k).length])
   ) as Record<EstadoOrden, number>;
@@ -965,6 +807,7 @@ export function GestionPage() {
             <StatChip label="En exportación" value={counts.exportacion} icon={<Ship size={15} style={{ color: '#7c3aed' }} />} accent="#f5f3ff" />
             <StatChip label="Total KG" value={`${(totalKg / 1000).toFixed(1)} t`} icon={<Weight size={15} style={{ color: CS }} />} />
             <StatChip label="Monto USD" value={`$${(totalUSD / 1000).toFixed(0)}k`} icon={<TrendingUp size={15} style={{ color: '#059669' }} />} accent="#ecfdf5" />
+            {totalPEN > 0 && <StatChip label="Monto S/." value={`S/.${(totalPEN / 1000).toFixed(0)}k`} icon={<TrendingUp size={15} style={{ color: '#2563EB' }} />} accent="#eff6ff" />}
           </div>
         </div>
 
@@ -1084,14 +927,14 @@ export function GestionPage() {
       
       {selected && modal === 'preventa'   && (
         <PreventaModal
-          orden={selected}
+          orden={{ ...selected, campana: selected.campana }}
           initialTab={(flowTab as 'muestras' | 'cotizacion') ?? 'muestras'}
           onClose={() => { setModal(null); setSelected(null); setFlowTab(undefined); }}
         />
       )}
       {selected && modal === 'alistado'   && (
         <AlistadoModal
-          orden={selected}
+          orden={{ ...selected, campana: selected.campana }}
           initialTab={(flowTab as 'compromiso' | 'lotes') ?? 'compromiso'}
           onClose={() => { setModal(null); setSelected(null); setFlowTab(undefined); }}
         />

@@ -6,9 +6,11 @@ import {
   TrillarDto, MovimientoKardex,
 } from '@/services/lotes-finales.service';
 import { tiposProductoService, TipoProducto } from '@/services/tipos-producto.service';
+import { skusService, Sku } from '@/services/skus.service';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { TablePagination } from '@/components/TablePagination';
 import LoadingLogo from '@/components/LoadingLogo';
+import { useToast } from '@/contexts/ToastContext';
 
 const ESTADO_LABEL: Record<LoteFinalEstado, string> = {
   PENDIENTE_TRILLADO: 'Pendiente trillado',
@@ -33,7 +35,10 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
   });
   const [plantaOtro, setPlantaOtro] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [skus, setSkus] = useState<Sku[]>([]);
+  const toast = useToast();
+
+  useEffect(() => { skusService.findAll().then(setSkus); }, []);
 
   const cantLf = Number(lf.cantidadKg);
   const suma = Number(form.pesoPfKg ?? 0) + Number(form.mermaReutilizableKg ?? 0) + Number(form.mermaDesechableKg ?? 0) + Number(form.sobranteExportableKg ?? 0);
@@ -53,15 +58,15 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.fecha || form.pesoPorQuintalKg == null || form.pesoPfKg == null) {
-      setError('Fecha, peso por quintal y PF son requeridos');
+      toast.error( 'Fecha, peso por quintal y PF son requeridos');
       return;
     }
     if (!form.planta?.trim() || !form.malla?.trim() || !form.tipoSeleccion?.trim() || !form.encargado?.trim()) {
-      setError('Planta, malla, tipo de selección y encargado son requeridos');
+      toast.error( 'Planta, malla, tipo de selección y encargado son requeridos');
       return;
     }
-    if (!r4Ok) { setError(`R4 — Suma (${suma.toFixed(2)} kg) ≠ LF (${cantLf.toFixed(2)} kg). Diferencia ${diferencia.toFixed(2)} kg > 0.5 kg`); return; }
-    setSaving(true); setError('');
+    if (!r4Ok) { toast.error( `R4 — Suma (${suma.toFixed(2)} kg) ≠ LF (${cantLf.toFixed(2)} kg). Diferencia ${diferencia.toFixed(2)} kg > 0.5 kg`); return; }
+    setSaving(true);
     try {
       await onConfirm({
         fecha: form.fecha!,
@@ -74,10 +79,11 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
         mermaReutilizableKg: Number(form.mermaReutilizableKg ?? 0),
         mermaDesechableKg: Number(form.mermaDesechableKg ?? 0),
         sobranteExportableKg: Number(form.sobranteExportableKg ?? 0),
+        skuId: form.skuId,
         observaciones: form.observaciones,
       });
       onClose();
-    } catch (err) { setError((err as Error).message); }
+    } catch (err) { toast.error( (err as Error).message); }
     finally { setSaving(false); }
   }
 
@@ -93,7 +99,6 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
         </div>
         {saving && <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.93)', backdropFilter: 'blur(2px)' }}><LoadingLogo compact /></div>}
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Fecha *</label><input type="date" value={form.fecha ?? ''} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} className={cls} /></div>
@@ -188,6 +193,14 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
             {quintales == null && (
               <p className="text-[0.65rem] text-blue-500 mt-2 text-center">Ingresa PF y Peso/Quintal para ver el cálculo</p>
             )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">SKU (nombre comercial)</label>
+            <select value={form.skuId ?? ''} onChange={e => setForm(f => ({ ...f, skuId: e.target.value ? Number(e.target.value) : undefined }))} className={cls}>
+              <option value="">Sin SKU</option>
+              {skus.map(s => <option key={s.id} value={s.id}>{s.codigo ? `${s.codigo} · ${s.nombre}` : s.nombre}</option>)}
+            </select>
           </div>
 
           <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Observaciones</label><textarea value={form.observaciones ?? ''} onChange={e => setForm(f => ({ ...f, observaciones: e.target.value || undefined }))} rows={2} className={`${cls} resize-none`} /></div>

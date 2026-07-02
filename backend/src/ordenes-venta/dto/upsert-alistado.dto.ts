@@ -25,4 +25,5 @@ export class UpsertAlistadoDto {
   @IsOptional() @IsBoolean() separarAlistado?: boolean;
   @IsOptional() @IsBoolean() planAlistado?: boolean;
   @IsOptional() @IsBoolean() costViaticos?: boolean;
+  @IsOptional() lotesAsignados?: { loteFinalId: number; codigo?: string; cantidadKg?: number | null; nroSacos?: number | null; fechaProceso?: string | null }[];
 }

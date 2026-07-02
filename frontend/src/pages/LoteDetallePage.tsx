@@ -5,6 +5,7 @@ import { tiposProductoService, TipoProducto } from '@/services/tipos-producto.se
 import { LoteFinal, LoteFinalOrigen } from '@/services/lotes-finales.service';
 import { muestrasService, Muestra } from '@/services/muestras.service';
 import LoadingLogo from '@/components/LoadingLogo';
+import { useToast } from '@/contexts/ToastContext';
 
 function apiMsg(err: unknown): string {
   const e = err as any;
@@ -38,21 +39,19 @@ const ESTADO_COLOR: Record<string, string> = {
   EXPORTADO:        'bg-indigo-100 text-indigo-700 border-indigo-200',
 };
 
-function PromoverModal({ lote, onClose, onConfirm }: { lote: Lote; onClose: () => void; onConfirm: (codigoLf?: string) => Promise<string> }) {
-  const [codigo, setCodigo] = useState('');
+function PromoverModal({ lote, onClose, onConfirm }: { lote: Lote; onClose: () => void; onConfirm: () => Promise<string> }) {
   const [saving, setSaving] = useState(false);
-  const [error,  setError]  = useState('');
   const [done,   setDone]   = useState('');
+  const toast = useToast();
 
   async function handleConfirm() {
     setSaving(true);
-    setError('');
     try {
-      const lfCodigo = await onConfirm(codigo || undefined);
+      const lfCodigo = await onConfirm();
       setDone(lfCodigo);
       setTimeout(onClose, 2000);
     } catch (err) {
-      setError(apiMsg(err));
+      toast.error(apiMsg(err));
     } finally {
       setSaving(false);
     }
@@ -77,11 +76,6 @@ function PromoverModal({ lote, onClose, onConfirm }: { lote: Lote; onClose: () =
           <>
             <h3 className="font-bold text-gray-800 mb-1">Pasar directo a Lote Final</h3>
             <p className="text-xs text-gray-500 mb-4">El lote <strong>{lote.codigo}</strong> ({Number(lote.cantidadKg).toFixed(2)} kg) se promoverá tal cual a Lote Final.</p>
-            {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">{error}</p>}
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Código LF (opcional)</label>
-              <input value={codigo} onChange={e => setCodigo(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Auto-generado si vacío" />
-            </div>
             <div className="flex gap-3">
               <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancelar</button>
               <button onClick={handleConfirm} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: '#2d5a3d' }}>Confirmar</button>
@@ -103,24 +97,23 @@ function DividirModal({ lote, onClose, onConfirm }: {
     { cantidadKg: '' as number | '' },
   ]);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const toast = useToast();
   const suma = partes.reduce((a, p) => a + Number(p.cantidadKg || 0), 0);
   const disponible = Number(lote.cantidadKg);
   const restante = disponible - suma;
 
   async function handleSubmit() {
     if (partes.some(p => !p.cantidadKg || Number(p.cantidadKg) <= 0)) {
-      setError('Ingresa la cantidad en kg para cada parte'); return;
+      toast.error('Ingresa la cantidad en kg para cada parte'); return;
     }
     if (suma > disponible + 0.001) {
-      setError(`La suma (${suma.toFixed(2)} kg) supera el disponible (${disponible.toFixed(2)} kg)`); return;
+      toast.error(`La suma (${suma.toFixed(2)} kg) supera el disponible (${disponible.toFixed(2)} kg)`); return;
     }
-    setSaving(true); setError('');
+    setSaving(true);
     try {
-      
       await onConfirm(partes.map(p => ({ codigoLf: '', cantidadKg: Number(p.cantidadKg) })));
       onClose();
-    } catch (err) { setError(apiMsg(err)); }
+    } catch (err) { toast.error(apiMsg(err)); }
     finally { setSaving(false); }
   }
 
@@ -150,8 +143,6 @@ function DividirModal({ lote, onClose, onConfirm }: {
           </div>
         )}
         <div className="px-6 py-5 space-y-3">
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
-
           {partes.map((p, i) => (
             <div key={i} className="flex items-end gap-2">
               <div className="flex-1">
@@ -235,7 +226,7 @@ function MezclarModal({ lote, onClose, onConfirm }: {
 
   const [busqueda, setBusqueda] = useState('');
   const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState('');
+  const toast = useToast();
 
   useEffect(() => {
     setLoadingLotes(true);
@@ -269,17 +260,17 @@ function MezclarModal({ lote, onClose, onConfirm }: {
   }
 
   async function handleSubmit() {
-    if (!kgActual || Number(kgActual) <= 0) { setError('Indica cuántos kg aporta este lote'); return; }
-    if (lotesSeleccionados.length === 0) { setError('Selecciona al menos un lote adicional para mezclar'); return; }
-    setSaving(true); setError('');
+    if (!kgActual || Number(kgActual) <= 0) { toast.error('Indica cuántos kg aporta este lote'); return; }
+    if (lotesSeleccionados.length === 0) { toast.error('Selecciona al menos un lote adicional para mezclar'); return; }
+    setSaving(true);
     try {
       const origenes = [
         { loteId: lote.id, cantidadKg: Number(kgActual) },
         ...lotesSeleccionados.map(([id, kg]) => ({ loteId: Number(id), cantidadKg: Number(kg) })),
       ];
-      await onConfirm(origenes, ''); 
+      await onConfirm(origenes, '');
       onClose();
-    } catch (err) { setError(apiMsg(err)); }
+    } catch (err) { toast.error(apiMsg(err)); }
     finally { setSaving(false); }
   }
 
@@ -319,8 +310,6 @@ function MezclarModal({ lote, onClose, onConfirm }: {
         )}
 
         <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
-
           <div>
             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Lote actual (incluido)</p>
             <div className="flex items-center gap-3 rounded-xl px-4 py-3 border border-gray-200 bg-gray-50">
@@ -490,8 +479,7 @@ export function LoteDetallePage() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<'promover' | 'dividir' | 'mezclar' | null>(null);
   const [accionando, setAccionando] = useState(false);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
+  const toast = useToast();
 
   useEffect(() => {
     tiposProductoService.getAll().then(setTiposProducto);
@@ -503,11 +491,11 @@ export function LoteDetallePage() {
     ]).then(([l, o, m]) => { setLote(l); setOrigenes(o); setMuestras(m.data); setLoading(false); });
   }, [id]);
 
-  async function handlePromover(codigoLf?: string): Promise<string> {
+  async function handlePromover(): Promise<string> {
     if (!lote) throw new Error('Sin lote');
     setAccionando(true);
     try {
-      const lf = await lotesService.promoverALf(lote.id, { codigoLf });
+      const lf = await lotesService.promoverALf(lote.id, {});
       const [l, o] = await Promise.all([lotesService.getOne(lote.id), lotesService.getLotesFinalOrigen(lote.id)]);
       setLote(l); setOrigenes(o);
       return lf.codigo;
@@ -520,7 +508,7 @@ export function LoteDetallePage() {
     if (!lote) return;
     try {
       const lfs = await lotesService.dividir({ loteId: lote.id, divisiones });
-      setSuccess(`División exitosa: ${lfs.map(f => f.codigo).join(', ')}`);
+      toast.success(`División exitosa: ${lfs.map(f => f.codigo).join(', ')}`);
       const [l, o] = await Promise.all([lotesService.getOne(lote.id), lotesService.getLotesFinalOrigen(lote.id)]);
       setLote(l); setOrigenes(o);
     } catch (err) { throw new Error(apiMsg(err)); }
@@ -528,7 +516,7 @@ export function LoteDetallePage() {
 
   async function handleMezclar(origenesInput: Array<{ loteId: number; cantidadKg: number }>, codigoLf: string) {
     const lf = await lotesService.mezclar({ origenes: origenesInput, codigoLf });
-    setSuccess(`Lote Final ${lf.codigo} creado por mezcla`);
+    toast.success(`Lote Final ${lf.codigo} creado por mezcla`);
     if (lote) {
       const [l, o] = await Promise.all([lotesService.getOne(lote.id), lotesService.getLotesFinalOrigen(lote.id)]);
       setLote(l); setOrigenes(o);
@@ -551,8 +539,6 @@ export function LoteDetallePage() {
         <span className={`px-3 py-1 rounded-full text-xs font-bold border ${ESTADO_COLOR[lote.estado]}`}>{ESTADO_LABEL[lote.estado]}</span>
       </div>
 
-      {error && <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{error}</div>}
-      {success && <div className="mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>{success}</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">

@@ -1,19 +1,31 @@
-import type { FiltroAño } from '@/types/dashboard.types';
-
 const CP = '#445D46';
-const TX = '#2C2C2C';
+
+interface Campana { id: number; nombre: string; }
 
 interface FiltroDashboardProps {
-  año: FiltroAño;
+  campanaId: number | null;
+  campanas: Campana[];
   almacen: string;
   almacenes: string[];
-  onAñoChange: (v: FiltroAño) => void;
+  onCampanaChange: (id: number | null) => void;
   onAlmacenChange: (v: string) => void;
 }
 
-export function FiltroDashboard({ año, almacen, almacenes, onAñoChange, onAlmacenChange }: FiltroDashboardProps) {
-  const años: FiltroAño[] = ['ambos', '2024', '2025'];
+const selectStyle: React.CSSProperties = {
+  border: '1px solid #D8E5D8',
+  borderRadius: 10,
+  padding: '6px 32px 6px 12px',
+  fontSize: '0.78rem',
+  fontWeight: 600,
+  color: CP,
+  background: `#F0F4F0 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237A9A7C' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center`,
+  appearance: 'none' as const,
+  WebkitAppearance: 'none' as const,
+  cursor: 'pointer',
+  outline: 'none',
+};
 
+export function FiltroDashboard({ campanaId, campanas, almacen, almacenes, onCampanaChange, onAlmacenChange }: FiltroDashboardProps) {
   return (
     <div
       className="rounded-2xl px-5 py-4 flex flex-wrap items-center gap-5"
@@ -26,46 +38,33 @@ export function FiltroDashboard({ año, almacen, almacenes, onAñoChange, onAlma
         <span className="text-[0.6rem] font-bold uppercase tracking-[0.14em]" style={{ color: '#7A9A7C' }}>
           Campaña
         </span>
-        <div
-          className="flex items-center p-0.5 rounded-xl gap-0.5"
-          style={{ background: '#F0F4F0' }}
+        <select
+          value={campanaId ?? ''}
+          onChange={e => onCampanaChange(e.target.value ? Number(e.target.value) : null)}
+          style={selectStyle}
         >
-          {años.map(a => (
-            <button
-              key={a}
-              onClick={() => onAñoChange(a)}
-              className="px-3.5 py-1.5 rounded-[0.6rem] text-[0.72rem] font-bold transition-all duration-150"
-              style={
-                año === a
-                  ? { background: CP, color: '#fff', boxShadow: '0 1px 4px rgba(68,93,70,0.25)' }
-                  : { background: 'transparent', color: '#7A9A7C' }
-              }
-            >
-              {a === 'ambos' ? 'Todos' : a}
-            </button>
+          <option value="">Todas</option>
+          {campanas.map(c => (
+            <option key={c.id} value={c.id}>{c.nombre}</option>
           ))}
-        </div>
+        </select>
       </div>
 
       {almacenes.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-3">
           <span className="text-[0.6rem] font-bold uppercase tracking-[0.14em]" style={{ color: '#7A9A7C' }}>
             Almacén
           </span>
-          {['todos', ...almacenes].map(a => (
-            <button
-              key={a}
-              onClick={() => onAlmacenChange(a)}
-              className="px-3 py-1 rounded-full text-[0.68rem] font-semibold transition-all duration-150"
-              style={
-                almacen === a
-                  ? { background: CP, color: '#fff' }
-                  : { background: '#F0F4F0', color: '#7A9A7C' }
-              }
-            >
-              {a === 'todos' ? 'Todos' : a}
-            </button>
-          ))}
+          <select
+            value={almacen}
+            onChange={e => onAlmacenChange(e.target.value)}
+            style={selectStyle}
+          >
+            <option value="todos">Todos</option>
+            {almacenes.map(a => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
         </div>
       )}
     </div>

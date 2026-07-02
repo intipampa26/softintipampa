@@ -11,17 +11,17 @@ function fmtFecha(iso: string) {
   return `${d}/${m}/${y}`;
 }
 
-function fmtDatetime(dt: string | null | undefined): string {
-  if (!dt) return '—';
+// Uses business date (fecha) for the date part, insertion time (horaEntrada) for the time part
+function fmtFechaHora(fecha: string, horaEntrada?: string | null): string {
+  const [y, m, d] = fecha.split('-');
+  const dateStr = `${d}/${m}/${y}`;
+  if (!horaEntrada) return dateStr;
   try {
-    const d = new Date(dt);
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yy = d.getFullYear();
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-    return `${dd}/${mm}/${yy} ${hh}:${mi}`;
-  } catch { return '—'; }
+    const dt = new Date(horaEntrada);
+    const hh = String(dt.getHours()).padStart(2, '0');
+    const mi = String(dt.getMinutes()).padStart(2, '0');
+    return `${dateStr} ${hh}:${mi}`;
+  } catch { return dateStr; }
 }
 
 function fmtKg(v: number | string | null | undefined) {
@@ -44,6 +44,7 @@ const TIPO_ORIGEN_LABEL: Record<string, string> = {
   MEZCLA:           'MEZCLA',
   MUESTRA:          'Env. Muestra',
   PREVENTA_MUESTRA: 'Env. Muestra',
+  VENTA:            'Venta',
 };
 
 const TIPO_ORIGEN_COLOR: Record<string, { bg: string; text: string }> = {
@@ -52,6 +53,7 @@ const TIPO_ORIGEN_COLOR: Record<string, { bg: string; text: string }> = {
   MEZCLA:           { bg: '#FFF7ED', text: '#9A3412' },
   MUESTRA:          { bg: '#F5F3FF', text: '#6D28D9' },
   PREVENTA_MUESTRA: { bg: '#F5F3FF', text: '#6D28D9' },
+  VENTA:            { bg: '#FEF2F2', text: '#991B1B' },
 };
 
 const MOTIVO_COLOR: Record<TipoMovimientoKardex, string> = {
@@ -287,7 +289,8 @@ export function KardexPage() {
                   const lf      = m.loteFinal;
                   const tp      = lf?.tipoProducto;
                   const origen  = getOrigenes(m);
-                  const tipoOrigenKey = (['MUESTRA', 'PREVENTA_MUESTRA'] as string[]).includes(m.referenciaTipo)
+                  const REFS_PROPIAS = ['MUESTRA', 'PREVENTA_MUESTRA', 'VENTA'] as string[];
+                  const tipoOrigenKey = REFS_PROPIAS.includes(m.referenciaTipo)
                     ? m.referenciaTipo
                     : (lf?.tipoOrigen ?? m.referenciaTipo ?? null);
                   const tipoOrigenStyle = tipoOrigenKey ? TIPO_ORIGEN_COLOR[tipoOrigenKey] : null;
@@ -302,7 +305,7 @@ export function KardexPage() {
                         {nOper}
                       </td>
                       <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap', fontSize: '0.68rem' }}>
-                        {m.horaEntrada ? fmtDatetime(m.horaEntrada) : fmtFecha(m.fecha)}
+                        {fmtFechaHora(m.fecha, m.horaEntrada)}
                       </td>
                       <td style={{ ...TD }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.72rem', color: '#1A2B23' }}>
@@ -398,7 +401,10 @@ export function KardexPage() {
             const isExit   = m.tipoMovimiento === 'SALIDA';
             const isMerma  = m.tipoMovimiento === 'MERMA';
             const origen   = getOrigenes(m);
-            const tipoOrigenKey = lf?.tipoOrigen ?? m.referenciaTipo ?? null;
+            const REFS_PROPIAS_M = ['MUESTRA', 'PREVENTA_MUESTRA', 'VENTA'] as string[];
+            const tipoOrigenKey = REFS_PROPIAS_M.includes(m.referenciaTipo)
+              ? m.referenciaTipo
+              : (lf?.tipoOrigen ?? m.referenciaTipo ?? null);
             const tipoOrigenStyle = tipoOrigenKey ? TIPO_ORIGEN_COLOR[tipoOrigenKey] : null;
 
             return (
@@ -435,7 +441,7 @@ export function KardexPage() {
 
                 <div className="px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-400">{m.horaEntrada ? fmtDatetime(m.horaEntrada) : fmtFecha(m.fecha)}</span>
+                    <span className="text-gray-400">{fmtFechaHora(m.fecha, m.horaEntrada)}</span>
                     <div className="flex items-center gap-2">
                       {isEntry && (
                         <span className="font-mono font-bold text-green-700">

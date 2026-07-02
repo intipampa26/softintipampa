@@ -122,7 +122,7 @@ export const evidenciasFamiliaresService = {
 
   async download(ev: EvidenciaFamiliar): Promise<void> {
     if (!navigator.onLine) {
-      alert('Descarga no disponible en modo offline.');
+      window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'offline', message: 'Descarga no disponible en modo offline.' } }));
       return;
     }
     const token = storageService.getAccessToken();

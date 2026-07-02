@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, CheckCheck, Calendar, ChevronDown, Star } from 'lucide-react';
-import LoadingLogo from './LoadingLogo';
+import { ModalLoadingOverlay } from '@/components/ui/ModalLoadingOverlay';
+import { useToast } from '@/contexts/ToastContext';
 import { ordenesVentaService } from '../services/ordenes-venta.service';
 
 const CP = '#445D46';
@@ -23,7 +24,7 @@ interface Props {
 }
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'feedback',  label: 'Feedback del Cliente'   },
+  { key: 'feedback',  label: 'Envío de Documentos Comerciales' },
   { key: 'reclamos',  label: 'Resolución de Problemas' },
 ];
 
@@ -43,7 +44,7 @@ export function PostVentaModal({ orden, initialTab = 'feedback', onClose }: Prop
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [loading,   setLoading]   = useState(true);
   const [saving,    setSaving]    = useState(false);
-  const [toast,     setToast]     = useState('');
+  const toast = useToast();
 
   const [fechaFeedback,  setFechaFeedback]  = useState('');
   const [rating,         setRating]         = useState(0);
@@ -88,11 +89,6 @@ export function PostVentaModal({ orden, initialTab = 'feedback', onClose }: Prop
       .finally(() => setLoading(false));
   }, [orden.dbId]);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3500);
-  };
-
   const handleGuardar = useCallback(async () => {
     setSaving(true);
     try {
@@ -114,9 +110,9 @@ export function PostVentaModal({ orden, initialTab = 'feedback', onClose }: Prop
         observReclamo:    observReclamo    || null,
       };
       await ordenesVentaService.upsertPostVenta(orden.dbId, dto);
-      showToast('Guardado correctamente');
+      toast.success('Guardado correctamente');
     } catch {
-      showToast('Error al guardar');
+      toast.error('Error al guardar');
     } finally {
       setSaving(false);
     }
@@ -125,8 +121,6 @@ export function PostVentaModal({ orden, initialTab = 'feedback', onClose }: Prop
     nroReclamo, fechaReclamo, tipoReclamo, descripcionReclamo, estadoReclamo, solucion, fechaResolucion, responsable, observReclamo,
     orden.dbId,
   ]);
-
-  const toastOk = toast && !toast.toLowerCase().includes('error');
 
   return (
     <div
@@ -138,19 +132,7 @@ export function PostVentaModal({ orden, initialTab = 'feedback', onClose }: Prop
         className="relative w-full sm:max-w-5xl rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden"
         style={{ background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(28px) saturate(1.4)', WebkitBackdropFilter: 'blur(28px) saturate(1.4)', border: '1px solid rgba(255,255,255,0.6)', boxShadow: '0 24px 60px rgba(0,0,0,0.22)', maxHeight: '92vh' }}
       >
-        {(saving || loading) && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-t-3xl sm:rounded-3xl" style={{ backgroundColor: 'rgba(255,255,255,0.93)', backdropFilter: 'blur(2px)' }}>
-            <LoadingLogo compact />
-            <p className="text-sm font-semibold text-gray-600 mt-3">{loading ? 'Cargando…' : 'Guardando…'}</p>
-          </div>
-        )}
-
-        {toast && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg"
-            style={{ backgroundColor: toastOk ? '#d1fae5' : '#fee2e2', color: toastOk ? '#065f46' : '#991b1b' }}>
-            {toast}
-          </div>
-        )}
+        <ModalLoadingOverlay show={saving || loading} message={loading ? 'Cargando…' : 'Guardando…'} />
 
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
           <div className="flex items-center gap-3 min-w-0">

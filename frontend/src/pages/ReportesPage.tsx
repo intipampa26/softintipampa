@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { reportesService, ResumenReporte } from '@/services/reportes.service';
+import { reportesService, ResumenReporte, ExportFilters } from '@/services/reportes.service';
 import { campanasService, Campana } from '@/services/campanas.service';
+import { skusService, Sku } from '@/services/skus.service';
 import LoadingLogo from '@/components/LoadingLogo';
+import { Filter, X, ChevronDown } from 'lucide-react';
 
 function KpiCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
@@ -18,6 +20,8 @@ function fmtKg(n: number) {
   return `${Number(n).toFixed(1)} kg`;
 }
 
+const SEL = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white appearance-none pr-8';
+
 export function ReportesPage() {
   const [campanas,    setCampanas]   = useState<Campana[]>([]);
   const [campanaId,   setCampanaId]  = useState<number | undefined>(undefined);
@@ -26,15 +30,28 @@ export function ReportesPage() {
   const [loadingCamp, setLoadingCamp] = useState(true);
   const [exporting,   setExporting]  = useState<string | null>(null);
 
+  // Filter options
+  const [skus,      setSkus]      = useState<Sku[]>([]);
+  const [almacenes, setAlmacenes] = useState<string[]>([]);
+
+  // Filters
+  const [filterSku,        setFilterSku]        = useState('');
+  const [filterFecha,      setFilterFecha]      = useState('');
+  const [filterFechaDesde, setFilterFechaDesde] = useState('');
+  const [filterFechaHasta, setFilterFechaHasta] = useState('');
+  const [filterAlmacen,    setFilterAlmacen]    = useState('');
+  const [showFilters,      setShowFilters]      = useState(false);
+
   useEffect(() => {
     setLoadingCamp(true);
     campanasService.getPage(1, 100)
       .then(res => setCampanas(res.data))
       .catch(() => {})
       .finally(() => setLoadingCamp(false));
+    skusService.findAll().then(setSkus).catch(() => {});
+    reportesService.getFilterOptions().then(o => setAlmacenes(o.almacenes)).catch(() => {});
   }, []);
 
-  
   useEffect(() => {
     setLoading(true);
     reportesService.getResumen(campanaId)
@@ -43,9 +60,42 @@ export function ReportesPage() {
       .finally(() => setLoading(false));
   }, [campanaId]);
 
-  function handleExport(tipo: 'productores' | 'lotes' | 'lotes-finales') {
+  const activeFilterCount = [
+    campanaId, filterSku, filterFecha, filterFechaDesde, filterFechaHasta, filterAlmacen,
+  ].filter(v => v !== undefined && v !== '').length;
+
+  function clearFilters() {
+    setCampanaId(undefined);
+    setFilterSku('');
+    setFilterFecha('');
+    setFilterFechaDesde('');
+    setFilterFechaHasta('');
+    setFilterAlmacen('');
+  }
+
+  function buildFilename(tipo: string) {
+    const parts = [tipo];
+    if (campanaId && resumen?.campana?.nombre)
+      parts.push(`camp-${resumen.campana.nombre.replace(/\s+/g, '_')}`);
+    if (filterSku)        parts.push(`sku-${filterSku.replace(/\s+/g, '_')}`);
+    if (filterFecha)      parts.push(`fecha-${filterFecha}`);
+    if (filterFechaDesde) parts.push(`desde-${filterFechaDesde}`);
+    if (filterFechaHasta) parts.push(`hasta-${filterFechaHasta}`);
+    if (filterAlmacen)    parts.push(`almacen-${filterAlmacen.replace(/\s+/g, '_')}`);
+    return parts.join('_');
+  }
+
+  function handleExport(tipo: 'productores' | 'lotes' | 'lotes-finales' | 'muestras' | 'ventas') {
     setExporting(tipo);
-    reportesService.downloadExcel(tipo, campanaId);
+    const filters: ExportFilters = {
+      campanaId,
+      sku:        filterSku        || undefined,
+      fecha:      filterFecha      || undefined,
+      fechaDesde: filterFechaDesde || undefined,
+      fechaHasta: filterFechaHasta || undefined,
+      almacen:    filterAlmacen    || undefined,
+    };
+    reportesService.downloadExcel(tipo, filters, buildFilename(tipo));
     setTimeout(() => setExporting(null), 2000);
   }
 
@@ -63,32 +113,15 @@ export function ReportesPage() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-        <div className="flex-1">
-          <h1 className="text-2xl font-black uppercase tracking-wide" style={{ color: '#172216' }}>
-            Reportes
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">Resumen y exportación de datos por campaña</p>
-        </div>
-
-        <div className="w-full sm:w-72">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Campaña
-          </label>
-          <select
-            value={campanaId ?? ''}
-            onChange={e => setCampanaId(e.target.value ? Number(e.target.value) : undefined)}
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none"
-            disabled={loadingCamp}
-          >
-            <option value="">Todas las campañas</option>
-            {campanas.map(c => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </select>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-black uppercase tracking-wide" style={{ color: '#172216' }}>
+          Reportes
+        </h1>
+        <p className="text-sm text-gray-500 mt-0.5">Resumen y exportación de datos por campaña</p>
       </div>
 
+      {/* KPIs */}
       {kpis && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <KpiCard label="Productores"    value={kpis.totalProductores} />
@@ -100,13 +133,139 @@ export function ReportesPage() {
         </div>
       )}
 
+      {/* Export section */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-        <h2 className="text-sm font-black uppercase tracking-wide text-gray-700">
-          Exportar a Excel
-        </h2>
-        <p className="text-xs text-gray-400">
-          {campanaId ? `Campaña: ${resumen?.campana?.nombre ?? campanaId}` : 'Todas las campañas'}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-wide text-gray-700">
+              Exportar a Excel
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {activeFilterCount > 0 ? `${activeFilterCount} filtro${activeFilterCount > 1 ? 's' : ''} activo${activeFilterCount > 1 ? 's' : ''}` : 'Sin filtros aplicados'}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all"
+            style={{
+              borderColor: activeFilterCount > 0 ? '#445D46' : '#D1D5DB',
+              color: activeFilterCount > 0 ? '#445D46' : '#6B7280',
+              backgroundColor: activeFilterCount > 0 ? '#445D4610' : 'transparent',
+            }}
+          >
+            <Filter size={12} />
+            Filtros
+            {activeFilterCount > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[0.55rem] font-black text-white" style={{ backgroundColor: '#445D46' }}>
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Filter panel */}
+        {showFilters && (
+          <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: '#D9DDD8', backgroundColor: '#F7F8F7' }}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[0.65rem] font-black uppercase tracking-widest text-gray-500">Filtros de exportación</span>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  className="flex items-center gap-1 text-[0.6rem] font-bold text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X size={10} /> Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[0.6rem] font-bold uppercase tracking-wide text-gray-500 mb-1">Campaña</label>
+                <div className="relative">
+                  <select
+                    value={campanaId ?? ''}
+                    onChange={e => setCampanaId(e.target.value ? Number(e.target.value) : undefined)}
+                    className={SEL}
+                    disabled={loadingCamp}
+                  >
+                    <option value="">Todas las campañas</option>
+                    {campanas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[0.6rem] font-bold uppercase tracking-wide text-gray-500 mb-1">SKU</label>
+                <div className="relative">
+                  <select value={filterSku} onChange={e => setFilterSku(e.target.value)} className={SEL}>
+                    <option value="">Todos los SKU</option>
+                    {skus.filter(s => s.activo).map(s => (
+                      <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[0.6rem] font-bold uppercase tracking-wide text-gray-500 mb-1">Almacén / Planta</label>
+                <div className="relative">
+                  <select value={filterAlmacen} onChange={e => setFilterAlmacen(e.target.value)} className={SEL}>
+                    <option value="">Todos los almacenes</option>
+                    {almacenes.map(a => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[0.6rem] font-bold uppercase tracking-wide text-gray-500 mb-1">Fecha exacta</label>
+                <input
+                  type="date"
+                  value={filterFecha}
+                  onChange={e => setFilterFecha(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white disabled:opacity-40"
+                  disabled={!!(filterFechaDesde || filterFechaHasta)}
+                />
+              </div>
+              <div>
+                <label className="block text-[0.6rem] font-bold uppercase tracking-wide text-gray-500 mb-1">Rango — Desde</label>
+                <input
+                  type="date"
+                  value={filterFechaDesde}
+                  onChange={e => { setFilterFechaDesde(e.target.value); setFilterFecha(''); }}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white disabled:opacity-40"
+                  disabled={!!filterFecha}
+                />
+              </div>
+              <div>
+                <label className="block text-[0.6rem] font-bold uppercase tracking-wide text-gray-500 mb-1">Rango — Hasta</label>
+                <input
+                  type="date"
+                  value={filterFechaHasta}
+                  onChange={e => { setFilterFechaHasta(e.target.value); setFilterFecha(''); }}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white disabled:opacity-40"
+                  disabled={!!filterFecha}
+                />
+              </div>
+            </div>
+
+            {activeFilterCount > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {campanaId        && <FilterTag label={`Campaña: ${resumen?.campana?.nombre ?? campanaId}`} onRemove={() => setCampanaId(undefined)} />}
+                {filterSku        && <FilterTag label={`SKU: ${filterSku}`}        onRemove={() => setFilterSku('')} />}
+                {filterAlmacen    && <FilterTag label={`Almacén: ${filterAlmacen}`} onRemove={() => setFilterAlmacen('')} />}
+                {filterFecha      && <FilterTag label={`Fecha: ${filterFecha}`}     onRemove={() => setFilterFecha('')} />}
+                {filterFechaDesde && <FilterTag label={`Desde: ${filterFechaDesde}`} onRemove={() => setFilterFechaDesde('')} />}
+                {filterFechaHasta && <FilterTag label={`Hasta: ${filterFechaHasta}`} onRemove={() => setFilterFechaHasta('')} />}
+              </div>
+            )}
+
+            <p className="text-[0.58rem] text-gray-400 italic">
+              SKU aplica a: Lotes Finales, Ventas · Almacén aplica a: Lotes, Muestras · Fechas aplican a todos los tipos
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <ExportBtn
@@ -127,9 +286,35 @@ export function ReportesPage() {
             loading={exporting === 'lotes-finales'}
             onClick={() => handleExport('lotes-finales')}
           />
+          <ExportBtn
+            label="Muestras"
+            description="Todas las muestras con puntajes, rendimiento y datos sensoriales"
+            loading={exporting === 'muestras'}
+            onClick={() => handleExport('muestras')}
+          />
+          <ExportBtn
+            label="Ventas"
+            description="Órdenes de venta con cliente, monto, mercado y etapa"
+            loading={exporting === 'ventas'}
+            onClick={() => handleExport('ventas')}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+function FilterTag({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <span
+      className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.6rem] font-bold"
+      style={{ backgroundColor: '#445D4615', color: '#445D46' }}
+    >
+      {label}
+      <button onClick={onRemove} className="hover:opacity-60 transition-opacity">
+        <X size={9} />
+      </button>
+    </span>
   );
 }
 

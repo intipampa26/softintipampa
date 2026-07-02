@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Ship, Calendar, ChevronDown, Package, FileText, Upload, Trash2, WifiOff, RefreshCw } from 'lucide-react';
-import LoadingLogo from './LoadingLogo';
+import { X, Ship, Calendar, ChevronDown, Package, FileText, Upload, Trash2, WifiOff, RefreshCw, Plus } from 'lucide-react';
+import { ModalLoadingOverlay } from '@/components/ui/ModalLoadingOverlay';
+import { useToast } from '@/contexts/ToastContext';
 import { ordenesVentaService } from '../services/ordenes-venta.service';
+import { lotesFinalesService } from '@/services/lotes-finales.service';
 
 const CP = '#445D46';
 const BD = '#D9DDD8';
@@ -38,6 +40,21 @@ function CheckboxUI({ checked, onChange }: { checked: boolean; onChange: () => v
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Tab = 'plan' | 'despacho' | 'cierre';
+
+interface LoteConPrecio {
+  key: string;
+  loteFinalId: number;
+  codigo: string;
+  sku: string;
+  cantidadKg: number;
+  precioPorKg: string;
+}
+
+interface ConceptoAdicional {
+  id: string;
+  nombre: string;
+  monto: string;
+}
 type DocEntry    = { numero: string; fecha: string; observaciones: string };
 type UploadedEntry = { name: string; file: string };
 
@@ -80,7 +97,7 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
   const [activeTab,    setActiveTab]    = useState<Tab>(initialTab);
   const [loading,      setLoading]      = useState(true);
   const [saving,       setSaving]       = useState(false);
-  const [toast,        setToast]        = useState('');
+  const toast = useToast();
   const [offline,      setOffline]      = useState(!navigator.onLine);
   const [pendingSync,  setPendingSync]  = useState(false);
 
@@ -140,24 +157,21 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
   const [observPlan,       setObservPlan]       = useState('');
 
   // Cierre
-  const [nroFactura,      setNroFactura]      = useState('');
-  const [fechaFactura,    setFechaFactura]    = useState('');
-  const [montoFinal,      setMontoFinal]      = useState('');
-  const [monedaCierre,    setMonedaCierre]    = useState<'USD' | 'PEN'>('USD');
-  const [fechaPagoCierre, setFechaPagoCierre] = useState('');
-  const [estadoPago,      setEstadoPago]      = useState('');
-  const [banco,           setBanco]           = useState('');
-  const [nroCuenta,       setNroCuenta]       = useState('');
-  const [observCierre,    setObservCierre]    = useState('');
+  const [nroFactura,           setNroFactura]           = useState('');
+  const [fechaFactura,         setFechaFactura]         = useState('');
+  const [montoFinal,           setMontoFinal]           = useState('');
+  const [monedaCierre,         setMonedaCierre]         = useState<'USD' | 'PEN'>('USD');
+  const [fechaPagoCierre,      setFechaPagoCierre]      = useState('');
+  const [estadoPago,           setEstadoPago]           = useState('');
+  const [banco,                setBanco]                = useState('');
+  const [nroCuenta,            setNroCuenta]            = useState('');
+  const [observCierre,         setObservCierre]         = useState('');
+  const [lotesConPrecio,       setLotesConPrecio]       = useState<LoteConPrecio[]>([]);
+  const [conceptosAdicionales, setConceptosAdicionales] = useState<ConceptoAdicional[]>([]);
+  const [loadingLotesCierre,   setLoadingLotesCierre]   = useState(false);
 
   const docFileRef = useRef<HTMLInputElement>(null);
   const repFileRef = useRef<HTMLInputElement>(null);
-
-  // ── Toast ────────────────────────────────────────────────────────────────────
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3500);
-  }, []);
 
   // ── Apply data to state ───────────────────────────────────────────────────────
   const applyData = useCallback((data: any) => {
@@ -218,6 +232,7 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
     setBanco(data.banco ?? '');
     setNroCuenta(data.nroCuenta ?? '');
     setObservCierre(data.observCierre ?? '');
+    setConceptosAdicionales(Array.isArray(data.conceptosAdicionales) ? data.conceptosAdicionales : []);
   }, [orden.tipoProducto, orden.campana, orden.lote]);
 
   // ── Build DTO from current state ─────────────────────────────────────────────
@@ -268,15 +283,17 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
     pesoNeto:        pesoNeto        ? parseFloat(pesoNeto)  : null,
     pesoBruto:       pesoBruto       ? parseFloat(pesoBruto) : null,
     observPlan:      observPlan      || null,
-    nroFactura:      nroFactura      || null,
-    fechaFactura:    fechaFactura    || null,
-    montoFinal:      montoFinal      ? parseFloat(montoFinal) : null,
+    nroFactura:           nroFactura      || null,
+    fechaFactura:         fechaFactura    || null,
+    montoFinal:           montoFinal      ? parseFloat(montoFinal) : null,
     monedaCierre,
-    fechaPagoCierre: fechaPagoCierre || null,
-    estadoPago:      estadoPago      || null,
-    banco:           banco           || null,
-    nroCuenta:       nroCuenta       || null,
-    observCierre:    observCierre    || null,
+    fechaPagoCierre:      fechaPagoCierre || null,
+    estadoPago:           estadoPago      || null,
+    banco:                banco           || null,
+    nroCuenta:            nroCuenta       || null,
+    observCierre:         observCierre    || null,
+    lotesConPrecio:       lotesConPrecio.length        ? lotesConPrecio        : null,
+    conceptosAdicionales: conceptosAdicionales.length  ? conceptosAdicionales  : null,
   }), [
     codExport, fechaExport, tipoProducto, cantExport, estadoAvance, kardexNro, kardexRegistrado,
     agente, naviera, almacen, nroDua, avisoSalida, nroBl, fechaSalidaNave,
@@ -287,6 +304,7 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
     fechaCorte, fechaZarpe, fechaEta, navieraPlan, puertoOrigenPlan, puertoDestinoPlan,
     tipoCont, cantCont, pesoNeto, pesoBruto, observPlan,
     nroFactura, fechaFactura, montoFinal, monedaCierre, fechaPagoCierre, estadoPago, banco, nroCuenta, observCierre,
+    lotesConPrecio, conceptosAdicionales,
   ]);
 
   // ── Sync pending offline save ─────────────────────────────────────────────────
@@ -298,9 +316,23 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
       removeCache(PENDING_KEY);
       writeCache(CACHE_KEY, result);
       setPendingSync(false);
-      showToast('Cambios sincronizados');
+      toast.success('Cambios sincronizados');
     } catch { /* retry on next online event */ }
-  }, [CACHE_KEY, PENDING_KEY, orden.dbId, showToast]);
+  }, [CACHE_KEY, PENDING_KEY, orden.dbId, toast]);
+
+  // Use refs so the useEffect doesn't re-run when these callbacks change identity
+  const syncPendingRef = useRef(syncPending);
+  const applyDataRef   = useRef(applyData);
+  useEffect(() => { syncPendingRef.current = syncPending; }, [syncPending]);
+  useEffect(() => { applyDataRef.current   = applyData;   }, [applyData]);
+
+  // ── Auto-calculate montoFinal from lotes + conceptos ─────────────────────────
+  useEffect(() => {
+    const total =
+      lotesConPrecio.reduce((s, l) => s + l.cantidadKg * (parseFloat(l.precioPorKg) || 0), 0) +
+      conceptosAdicionales.reduce((s, c) => s + (parseFloat(c.monto) || 0), 0);
+    setMontoFinal(total > 0 ? total.toFixed(2) : '');
+  }, [lotesConPrecio, conceptosAdicionales]);
 
   // ── Load + online/offline listeners ──────────────────────────────────────────
   useEffect(() => {
@@ -309,25 +341,63 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
     const load = async () => {
       if (!navigator.onLine) {
         const cached = readCache(CACHE_KEY);
-        if (cached) applyData(cached);
+        if (cached) applyDataRef.current(cached);
         setOffline(true);
         setLoading(false);
         return;
       }
+      let expData: any = null;
       try {
-        const data = await ordenesVentaService.getExportacion(orden.dbId);
-        if (data) { applyData(data); writeCache(CACHE_KEY, data); }
+        expData = await ordenesVentaService.getExportacion(orden.dbId);
+        if (expData) { applyDataRef.current(expData); writeCache(CACHE_KEY, expData); }
       } catch {
         const cached = readCache(CACHE_KEY);
-        if (cached) { applyData(cached); setOffline(true); }
+        if (cached) { applyDataRef.current(cached); setOffline(true); expData = cached; }
       }
       setLoading(false);
+
+      // Load alistado to build lotesConPrecio (merge with saved prices)
+      try {
+        const alistado = await ordenesVentaService.getAlistado(orden.dbId);
+        const asignados: any[] = Array.isArray(alistado?.lotesAsignados) ? alistado.lotesAsignados : [];
+        if (asignados.length > 0) {
+          setLoadingLotesCierre(true);
+          const savedPrecios: LoteConPrecio[] = Array.isArray(expData?.lotesConPrecio) ? expData.lotesConPrecio : [];
+          const merged: LoteConPrecio[] = [];
+          for (const a of asignados) {
+            const lfId = Number(a.loteFinalId ?? 0);
+            const key  = a.esManual ? `manual-${a.codigo}` : `lf-${lfId}`;
+            const saved = savedPrecios.find(p => p.key === key);
+            let sku    = a.descripcion ?? a.codigo ?? '—';
+            let codigo = a.codigo ?? '';
+            let cantidadKg = Number(a.cantidadKg ?? 0);
+            if (!a.esManual && lfId > 0) {
+              try {
+                const det = await lotesFinalesService.getDetalle(lfId);
+                sku       = (det.loteFinal.sku?.nombre ?? codigo) || '—';
+                if (!codigo) codigo = det.loteFinal.codigo ?? '';
+                if (!cantidadKg) cantidadKg = Number(det.loteFinal.cantidadKg ?? 0);
+              } catch { /* keep values from alistado */ }
+            }
+            merged.push({
+              key,
+              loteFinalId: lfId,
+              codigo,
+              sku,
+              cantidadKg,
+              precioPorKg: saved?.precioPorKg ?? '',
+            });
+          }
+          setLotesConPrecio(merged);
+          setLoadingLotesCierre(false);
+        }
+      } catch { /* silent — lotes cierre is optional */ }
     };
     load();
 
     const handleOnline = async () => {
       setOffline(false);
-      await syncPending();
+      await syncPendingRef.current();
     };
     const handleOffline = () => setOffline(true);
 
@@ -337,7 +407,8 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
       window.removeEventListener('online',  handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [orden.dbId, CACHE_KEY, PENDING_KEY, applyData, syncPending]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orden.dbId, CACHE_KEY, PENDING_KEY]);
 
   // ── Save ─────────────────────────────────────────────────────────────────────
   const handleGuardar = useCallback(async () => {
@@ -345,7 +416,7 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
     if (offline) {
       writeCache(PENDING_KEY, dto);
       setPendingSync(true);
-      showToast('Sin conexión — guardado localmente');
+      toast.offline('Sin conexión — guardado localmente');
       return;
     }
     setSaving(true);
@@ -354,22 +425,38 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
       writeCache(CACHE_KEY, result);
       removeCache(PENDING_KEY);
       setPendingSync(false);
-      showToast('Guardado correctamente');
+      if (!kardexRegistrado) {
+        try {
+          await ordenesVentaService.updateEtapa(
+            orden.dbId,
+            'exportacion',
+            'en_proceso',
+            new Date().toISOString().slice(0, 10),
+          );
+          const updated = await ordenesVentaService.getExportacion(orden.dbId);
+          if (updated) {
+            setKardexNro(updated.kardexNro ?? '');
+            setKardexRegistrado(updated.kardexRegistrado ?? false);
+            writeCache(CACHE_KEY, updated);
+          }
+        } catch { /* kardex falla silencioso — la data ya fue guardada */ }
+      }
+      toast.success('Guardado correctamente');
     } catch {
       writeCache(PENDING_KEY, dto);
       setPendingSync(true);
-      showToast('Error de red — guardado localmente');
+      toast.offline('Error de red — guardado localmente');
     } finally {
       setSaving(false);
     }
-  }, [buildDto, offline, orden.dbId, CACHE_KEY, PENDING_KEY, showToast]);
+  }, [buildDto, offline, orden.dbId, CACHE_KEY, PENDING_KEY, toast]);
 
   // ── File upload handlers ──────────────────────────────────────────────────────
   const handleUploadDocumento = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!navigator.onLine) {
-      showToast('Sin conexión — conectate para subir archivos');
+      toast.offline('Sin conexión — conectate para subir archivos');
       if (docFileRef.current) docFileRef.current.value = '';
       return;
     }
@@ -377,7 +464,7 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
     try {
       const updated = await ordenesVentaService.uploadExportacionFile(orden.dbId, 'documentos', file);
       setDocumentosAsociados(updated);
-    } catch { showToast('Error al subir archivo'); }
+    } catch { toast.error('Error al subir archivo'); }
     finally {
       setUploadingDoc(false);
       if (docFileRef.current) docFileRef.current.value = '';
@@ -385,18 +472,18 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
   };
 
   const handleDeleteDocumento = async (filename: string) => {
-    if (!navigator.onLine) { showToast('Sin conexión'); return; }
+    if (!navigator.onLine) { toast.offline('Sin conexión'); return; }
     try {
       const updated = await ordenesVentaService.deleteExportacionFile(orden.dbId, 'documentos', filename);
       setDocumentosAsociados(updated);
-    } catch { showToast('Error al eliminar'); }
+    } catch { toast.error('Error al eliminar'); }
   };
 
   const handleUploadReporte = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!navigator.onLine) {
-      showToast('Sin conexión — conectate para subir archivos');
+      toast.offline('Sin conexión — conectate para subir archivos');
       if (repFileRef.current) repFileRef.current.value = '';
       return;
     }
@@ -404,7 +491,7 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
     try {
       const updated = await ordenesVentaService.uploadExportacionFile(orden.dbId, 'reportes', file);
       setReportesCalidad(updated);
-    } catch { showToast('Error al subir archivo'); }
+    } catch { toast.error('Error al subir archivo'); }
     finally {
       setUploadingRep(false);
       if (repFileRef.current) repFileRef.current.value = '';
@@ -412,11 +499,11 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
   };
 
   const handleDeleteReporte = async (filename: string) => {
-    if (!navigator.onLine) { showToast('Sin conexión'); return; }
+    if (!navigator.onLine) { toast.offline('Sin conexión'); return; }
     try {
       const updated = await ordenesVentaService.deleteExportacionFile(orden.dbId, 'reportes', filename);
       setReportesCalidad(updated);
-    } catch { showToast('Error al eliminar'); }
+    } catch { toast.error('Error al eliminar'); }
   };
 
   const updateDocEntry = (key: string, field: keyof DocEntry, value: string) => {
@@ -426,7 +513,6 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
     }));
   };
 
-  const toastOk = toast && !toast.toLowerCase().includes('error') && !toast.toLowerCase().includes('sin conexión');
   const monedaCierreSymbol = monedaCierre === 'PEN' ? 'S/.' : 'USD';
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -440,21 +526,7 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
         className="relative w-full sm:max-w-5xl rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden"
         style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(28px) saturate(1.4)', WebkitBackdropFilter: 'blur(28px) saturate(1.4)', border: '1px solid rgba(255,255,255,0.6)', boxShadow: '0 24px 60px rgba(0,0,0,0.22)', maxHeight: '92dvh' }}
       >
-        {/* Loading / saving overlay */}
-        {(saving || loading) && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-t-3xl sm:rounded-3xl" style={{ backgroundColor: 'rgba(255,255,255,0.93)', backdropFilter: 'blur(2px)' }}>
-            <LoadingLogo compact />
-            <p className="text-sm font-semibold text-gray-600 mt-3">{loading ? 'Cargando…' : 'Guardando…'}</p>
-          </div>
-        )}
-
-        {/* Toast */}
-        {toast && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-xl text-xs font-bold shadow-lg max-w-[90vw] text-center"
-            style={{ backgroundColor: toastOk ? '#d1fae5' : '#fee2e2', color: toastOk ? '#065f46' : '#991b1b' }}>
-            {toast}
-          </div>
-        )}
+        <ModalLoadingOverlay show={saving || loading} message={loading ? 'Cargando…' : 'Guardando…'} />
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b shrink-0" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
@@ -732,13 +804,18 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
                     <div className="flex-1 rounded-xl border px-3 py-2.5 flex items-center gap-2" style={{ borderColor: kardexRegistrado ? CP : BD, backgroundColor: kardexRegistrado ? `${CP}08` : '#fff' }}>
                       <Package size={13} style={{ color: CP, opacity: kardexRegistrado ? 1 : 0.4, flexShrink: 0 }} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[0.55rem] font-black uppercase tracking-wide" style={{ color: TX, opacity: 0.5 }}>Kardex</p>
-                        <input value={kardexNro} onChange={e => setKardexNro(e.target.value)} className="w-full text-xs bg-transparent outline-none font-semibold mt-0.5" style={{ color: TX }} placeholder="N° mov…" />
+                        <p className="text-[0.55rem] font-black uppercase tracking-wide" style={{ color: TX, opacity: 0.5 }}>
+                          Kardex · N° Movimiento
+                        </p>
+                        {kardexRegistrado && kardexNro ? (
+                          <p className="text-xs font-bold mt-0.5" style={{ color: CP }}>#{kardexNro} — registrado automáticamente</p>
+                        ) : (
+                          <p className="text-xs mt-0.5 text-gray-400 italic">Se registra al avanzar a exportación</p>
+                        )}
                       </div>
-                      <label className="flex items-center gap-1 cursor-pointer shrink-0">
-                        <CheckboxUI checked={kardexRegistrado} onChange={() => setKardexRegistrado(v => !v)} />
-                        <span className="text-[0.55rem] font-bold uppercase" style={{ color: kardexRegistrado ? CP : '#9CA3AF' }}>OK</span>
-                      </label>
+                      {kardexRegistrado && (
+                        <span className="text-[0.6rem] font-black uppercase px-2 py-0.5 rounded-full" style={{ backgroundColor: `${CP}20`, color: CP }}>✓ OK</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -817,6 +894,21 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
           {activeTab === 'cierre' && (
             <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* ── Currency selector ── */}
+                <div className="sm:col-span-2 flex items-center gap-3 px-4 py-3 rounded-xl" style={{ backgroundColor: `${CP}08`, border: `1px solid ${CP}20` }}>
+                  <span className="text-[0.65rem] font-black uppercase tracking-wide shrink-0" style={{ color: CP }}>Moneda</span>
+                  <div className="flex rounded-xl overflow-hidden border shrink-0" style={{ borderColor: BD }}>
+                    {(['USD', 'PEN'] as const).map(m => (
+                      <button key={m} type="button" onClick={() => setMonedaCierre(m)}
+                        className="px-4 py-1.5 text-xs font-black transition-colors touch-manipulation"
+                        style={{ backgroundColor: monedaCierre === m ? CP : 'transparent', color: monedaCierre === m ? '#fff' : TX }}>
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-[0.62rem] text-gray-400 italic">Aplica a lotes, conceptos y monto final</span>
+                </div>
+
                 <div>{fieldLabel('N° Factura')}<input value={nroFactura} onChange={e => setNroFactura(e.target.value)} className={INP} style={inpStyle} placeholder="F001-00001" /></div>
                 <div>
                   {fieldLabel('Fecha de factura')}
@@ -825,19 +917,155 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
                     <Calendar size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
-                <div>
-                  {fieldLabel('Monto final')}
-                  <div className="flex gap-2">
-                    <div className="flex rounded-xl overflow-hidden border shrink-0" style={{ borderColor: BD }}>
-                      {(['USD','PEN'] as const).map(m => (
-                        <button key={m} type="button" onClick={() => setMonedaCierre(m)}
-                          className="px-3 py-2 text-xs font-bold transition-colors touch-manipulation"
-                          style={{ backgroundColor: monedaCierre === m ? CP : 'transparent', color: monedaCierre === m ? '#fff' : TX }}>
-                          {m}
-                        </button>
+                {/* ── Desglose por lote ── */}
+                {(() => {
+                  const lotesValidos = lotesConPrecio.filter(l => l.loteFinalId > 0 || Boolean(l.codigo));
+                  return (
+                    <div className="sm:col-span-2 rounded-2xl overflow-hidden border" style={{ borderColor: '#B8DDB8' }}>
+                      <div className="flex items-center gap-2 px-4 py-2.5" style={{ backgroundColor: '#4E644E' }}>
+                        <Package size={13} className="text-white opacity-80" />
+                        <span className="text-xs font-black uppercase tracking-widest text-white">Desglose por Lote</span>
+                        {loadingLotesCierre && <div className="ml-auto w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                      </div>
+                      {!loadingLotesCierre && lotesValidos.length === 0 ? (
+                        <div className="px-4 py-6 text-center">
+                          <p className="text-xs text-gray-400 italic">No se asignaron lotes a esta orden</p>
+                        </div>
+                      ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[480px] text-xs">
+                          <thead>
+                            <tr style={{ backgroundColor: '#E8F3E8' }}>
+                              {['SKU', 'CÓDIGO', 'KG', `PRECIO / KG (${monedaCierreSymbol})`, 'TOTAL'].map(h => (
+                                <th key={h} className="px-3 py-2 text-left font-black uppercase tracking-wide whitespace-nowrap" style={{ color: '#4E644E', fontSize: '0.6rem' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                          {lotesValidos.map(l => {
+                            const precio = parseFloat(l.precioPorKg) || 0;
+                            const total  = l.cantidadKg * precio;
+                            return (
+                              <tr key={l.key} className="border-t" style={{ borderColor: '#E8F3E8' }}>
+                                <td className="px-3 py-2">
+                                  {l.sku
+                                    ? <span className="px-2 py-0.5 rounded-full text-[0.58rem] font-bold bg-green-50 text-green-700">{l.sku}</span>
+                                    : <span className="text-gray-400">—</span>}
+                                </td>
+                                <td className="px-3 py-2 font-bold" style={{ color: '#4E644E' }}>{l.codigo}</td>
+                                <td className="px-3 py-2 tabular-nums">{l.cantidadKg.toLocaleString()} kg</td>
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="number" min={0} step="0.01"
+                                    value={l.precioPorKg}
+                                    placeholder="0.00"
+                                    onChange={e => setLotesConPrecio(prev => prev.map(x => x.key === l.key ? { ...x, precioPorKg: e.target.value } : x))}
+                                    className="w-28 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-600 bg-white tabular-nums"
+                                    style={{ borderColor: '#B8DDB8' }}
+                                  />
+                                </td>
+                                <td className="px-3 py-2 font-bold tabular-nums" style={{ color: total > 0 ? '#4E644E' : '#9CA3AF' }}>
+                                  {total > 0 ? `${monedaCierreSymbol} ${total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}` : '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          </tbody>
+                        </table>
+                      </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* ── Conceptos adicionales ── */}
+                <div className="sm:col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    {fieldLabel('Conceptos Adicionales')}
+                    <button
+                      type="button"
+                      onClick={() => setConceptosAdicionales(prev => [...prev, { id: String(Date.now()), nombre: '', monto: '' }])}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.6rem] font-black uppercase tracking-wide transition-all hover:opacity-80"
+                      style={{ backgroundColor: CP + '18', color: CP }}
+                    >
+                      <Plus size={10} />Añadir concepto
+                    </button>
+                  </div>
+                  {conceptosAdicionales.length > 0 ? (
+                    <div className="space-y-2">
+                      {conceptosAdicionales.map(c => (
+                        <div key={c.id} className="flex gap-2 items-center">
+                          <input
+                            value={c.nombre}
+                            onChange={e => setConceptosAdicionales(prev => prev.map(x => x.id === c.id ? { ...x, nombre: e.target.value } : x))}
+                            placeholder="Flete, seguro, comisión…"
+                            className={`${INP} flex-1`}
+                            style={inpStyle}
+                          />
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-xs text-gray-400 shrink-0">{monedaCierreSymbol}</span>
+                            <input
+                              type="number" min={0} step="0.01"
+                              value={c.monto}
+                              onChange={e => setConceptosAdicionales(prev => prev.map(x => x.id === c.id ? { ...x, monto: e.target.value } : x))}
+                              placeholder="0.00"
+                              className="w-32 border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600 tabular-nums"
+                              style={inpStyle}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setConceptosAdicionales(prev => prev.filter(x => x.id !== c.id))}
+                            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 hover:opacity-90"
+                            style={{ backgroundColor: '#FF0059' }}
+                          >
+                            <Trash2 size={12} className="text-white" />
+                          </button>
+                        </div>
                       ))}
                     </div>
-                    <input type="number" min={0} step="0.01" value={montoFinal} onChange={e => setMontoFinal(e.target.value)} className={`${INP} flex-1`} style={inpStyle} placeholder="0.00" />
+                  ) : (
+                    <p className="text-[0.65rem] text-gray-400 italic">Sin conceptos — usa el botón para añadir flete, seguro, etc.</p>
+                  )}
+                </div>
+
+                {/* ── Resumen calculado ── */}
+                {(lotesConPrecio.some(l => parseFloat(l.precioPorKg) > 0) || conceptosAdicionales.some(c => parseFloat(c.monto) > 0)) && (() => {
+                  const totalLotes = lotesConPrecio.reduce((s, l) => s + l.cantidadKg * (parseFloat(l.precioPorKg) || 0), 0);
+                  const totalConceptos = conceptosAdicionales.reduce((s, c) => s + (parseFloat(c.monto) || 0), 0);
+                  const gran = totalLotes + totalConceptos;
+                  return (
+                    <div className="sm:col-span-2 rounded-xl px-4 py-3.5 space-y-1.5" style={{ backgroundColor: `${CP}08`, border: `1px solid ${CP}22` }}>
+                      {lotesConPrecio.filter(l => parseFloat(l.precioPorKg) > 0).map(l => {
+                        const total = l.cantidadKg * (parseFloat(l.precioPorKg) || 0);
+                        return (
+                          <div key={l.key} className="flex justify-between text-xs">
+                            <span style={{ color: '#6B7280' }}>{l.codigo}{l.sku ? ` · ${l.sku}` : ''}</span>
+                            <span className="tabular-nums" style={{ color: TX }}>{monedaCierreSymbol} {total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        );
+                      })}
+                      {conceptosAdicionales.filter(c => c.nombre && parseFloat(c.monto) > 0).map(c => (
+                        <div key={c.id} className="flex justify-between text-xs">
+                          <span style={{ color: '#6B7280' }}>{c.nombre}</span>
+                          <span className="tabular-nums" style={{ color: TX }}>{monedaCierreSymbol} {parseFloat(c.monto).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      ))}
+                      <div className="pt-1.5 mt-0.5 border-t flex justify-between items-center" style={{ borderColor: `${CP}25` }}>
+                        <span className="text-[0.65rem] font-black uppercase tracking-wide" style={{ color: CP }}>Total calculado</span>
+                        <span className="text-base font-black tabular-nums" style={{ color: CP }}>{monedaCierreSymbol} {gran.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="sm:col-span-2">
+                  {fieldLabel('Monto final')}
+                  <div className="rounded-xl px-4 py-3 flex items-center justify-between" style={{ backgroundColor: `${CP}12`, border: `1px solid ${CP}30` }}>
+                    <span className="text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: CP }}>Total</span>
+                    <span className="text-xl font-black tabular-nums" style={{ color: CP }}>
+                      {monedaCierreSymbol} {montoFinal ? parseFloat(montoFinal).toLocaleString('es-PE', { minimumFractionDigits: 2 }) : '—'}
+                    </span>
                   </div>
                 </div>
                 <div>
@@ -868,12 +1096,6 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
                   </div>
                 </div>
                 <div className="sm:col-span-2">{fieldLabel('N° Cuenta / SWIFT / IBAN')}<input value={nroCuenta} onChange={e => setNroCuenta(e.target.value)} className={INP} style={inpStyle} placeholder="Número de cuenta o código SWIFT…" /></div>
-                {montoFinal && (
-                  <div className="sm:col-span-2 rounded-xl px-4 py-3 flex items-center gap-3" style={{ backgroundColor: `${CP}12` }}>
-                    <p className="text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: CP }}>Monto final:</p>
-                    <p className="font-black text-base" style={{ color: CP }}>{monedaCierreSymbol} {parseFloat(montoFinal).toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
-                  </div>
-                )}
                 <div className="sm:col-span-2">
                   {fieldLabel('Observaciones')}
                   <textarea rows={2} value={observCierre} onChange={e => setObservCierre(e.target.value)} className={`${INP} resize-none`} style={inpStyle} placeholder="Notas del cierre…" />

@@ -28,6 +28,7 @@ import LoadingLogo from '@/components/LoadingLogo';
 import { EvaluacionFisicaContent } from '@/components/EvaluacionFisicaContent';
 import { EvaluacionFisicaCacaoContent } from '@/components/EvaluacionFisicaCacaoContent';
 import { EvaluacionSensorialCafeContent } from '@/components/EvaluacionSensorialCafeContent';
+import { useToast } from '@/contexts/ToastContext';
 
 const ESTADO_LABEL: Record<string, string> = {
   pendiente:  'PENDIENTE',
@@ -60,8 +61,8 @@ function FormularioModal({ muestra, onClose, onGuardado }: FormularioModalProps)
   const [fisicaLoading,      setFisicaLoading]      = useState(false);
   const [cafeSensorialLoading, setCafeSensorialLoading] = useState(false);
   const [saving,             setSaving]             = useState(false);
-  const [error,              setError]              = useState('');
   const [saveResult,         setSaveResult]         = useState<null | 'success' | 'error'>(null);
+  const toast = useToast();
 
   const iictDataRef = useRef<IICTEData | null>(null);
   const [iictData,  setIictData] = useState<Partial<IICTEData>>({});
@@ -91,10 +92,10 @@ function FormularioModal({ muestra, onClose, onGuardado }: FormularioModalProps)
   }, [muestra.id, esCacao]);
 
   async function handleGuardar() {
-    setSaving(true); setError('');
+    setSaving(true);
     try {
       const data = iictDataRef.current;
-      if (!data) { setError('Completa el formulario antes de guardar'); setSaving(false); return; }
+      if (!data) { toast.error('Completa el formulario antes de guardar'); setSaving(false); return; }
       await muestrasService.upsertEvaluacionSensorial(muestra.id, {
         cacaoPuntajeTotal: data.puntajeTotal,
         fechaEvaluacion:   data.fecha,
@@ -105,7 +106,7 @@ function FormularioModal({ muestra, onClose, onGuardado }: FormularioModalProps)
       setSaveResult('success');
       setTimeout(() => { setSaveResult(null); onClose(); }, 2000);
     } catch {
-      setError('Error al guardar. Intenta de nuevo.');
+      toast.error('Error al guardar. Intenta de nuevo.');
       setSaveResult('error');
     } finally {
       setSaving(false);
@@ -225,9 +226,6 @@ function FormularioModal({ muestra, onClose, onGuardado }: FormularioModalProps)
         )}
 
         <div className="overflow-y-auto flex-1 px-6 py-5">
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-4">{error}</p>}
-
-          
           {tab === 'fisica' && esCacao && (
             <EvaluacionFisicaCacaoContent
               muestra={muestra}
@@ -359,8 +357,8 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
   });
 
   const [saving,       setSaving]       = useState(false);
-  const [error,        setError]        = useState('');
   const [cantidadUnit, setCantidadUnit] = useState<'kg' | 'g'>('kg');
+  const toast = useToast();
 
   const cls  = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
   const set  = <K extends keyof CreateMuestraDto>(k: K) =>
@@ -462,10 +460,10 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.productorId || !form.campanaId) {
-      setError('Campaña y Productor son requeridos');
+      toast.error('Campaña y Productor son requeridos');
       return;
     }
-    setSaving(true); setError('');
+    setSaving(true);
     try {
       const loteEraPreexistente = !!form.loteId;
       let loteId = form.loteId ? Number(form.loteId) : undefined;
@@ -492,7 +490,7 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
         loteCreado: !loteEraPreexistente,
       }, initial?.id);
       onClose();
-    } catch { setError('Error al guardar. Intenta de nuevo.'); }
+    } catch { toast.error('Error al guardar. Intenta de nuevo.'); }
     finally  { setSaving(false); }
   }
 
@@ -524,8 +522,6 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
         )}
 
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
-
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <span className="w-5 h-5 rounded-full text-white text-[0.65rem] font-black flex items-center justify-center shrink-0" style={{ backgroundColor: '#1A2B23' }}>1</span>
@@ -1073,7 +1069,7 @@ function AdquirirModal({
   const [lote,   setLote]   = useState<Lote | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
-  const [error,   setError]   = useState('');
+  const toast = useToast();
 
   const [form, setForm] = useState({
     cantidadKg:       '',
@@ -1098,14 +1094,14 @@ function AdquirirModal({
         observaciones:    l.observaciones ?? '',
       });
       setLoading(false);
-    }).catch(() => { setError('Error al cargar datos del lote'); setLoading(false); });
+    }).catch(() => { toast.error('Error al cargar datos del lote'); setLoading(false); });
   }, [loteRef.id]);
 
   async function handleConfirm(e: React.FormEvent) {
     e.preventDefault();
     const kg = parseFloat(form.cantidadKg);
-    if (!kg || kg <= 0) { setError('La cantidad (kg) es requerida y debe ser mayor a 0'); return; }
-    setSaving(true); setError('');
+    if (!kg || kg <= 0) { toast.error('La cantidad (kg) es requerida y debe ser mayor a 0'); return; }
+    setSaving(true);
     try {
       await onConfirm({
         estado:           'POST_ADQUISICION',
@@ -1116,7 +1112,7 @@ function AdquirirModal({
         planta:           form.planta           || undefined,
         observaciones:    form.observaciones    || undefined,
       });
-    } catch { setError('Error al guardar'); setSaving(false); }
+    } catch { toast.error('Error al guardar'); setSaving(false); }
   }
 
   return (
@@ -1144,8 +1140,6 @@ function AdquirirModal({
         )}
 
         <form onSubmit={handleConfirm} className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
-
           {lote && (
             <div className="bg-gray-50 rounded-xl px-4 py-3 text-xs text-gray-500 space-y-1">
               <p><span className="font-semibold text-gray-700">Código:</span> {lote.codigo}</p>
@@ -1165,7 +1159,7 @@ function AdquirirModal({
                 <input
                   type="number" min="0.001" step="0.001"
                   value={form.cantidadKg}
-                  onChange={(e) => { setForm(f => ({ ...f, cantidadKg: e.target.value })); setError(''); }}
+                  onChange={(e) => { setForm(f => ({ ...f, cantidadKg: e.target.value })); }}
                   placeholder="0.000" autoFocus
                   className={`${cls} pr-9`}
                 />

@@ -11,11 +11,11 @@ const BG = '#F7F8F7';
 const INP_SEARCH = 'w-full border rounded-xl px-3 py-2.5 pr-10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600 transition-all';
 const inpStyle   = { borderColor: BD, color: TX };
 
-interface LoteRow { id: number; codigo: string; nombre: string; producto: string; cantidad: string; sacos: string; productor: string; fechas: string; }
+interface LoteRow { id: number; codigo: string; nombre: string; producto: string; cantidad: string; sacos: string; productor: string; sku: string; fechas: string; }
 
 const LOTES_INIT: LoteRow[] = [
-  { id: 1, codigo: 'LF1', nombre: 'DIAMANTE',    producto: 'PERGAMINO', cantidad: '', sacos: '', productor: 'CAFFE SAC', fechas: '' },
-  { id: 2, codigo: 'LF2', nombre: 'ORO VERDE 3', producto: 'ORO',       cantidad: '', sacos: '', productor: 'JUAN',      fechas: '' },
+  { id: 1, codigo: 'LF1', nombre: 'DIAMANTE',    producto: 'PERGAMINO', cantidad: '', sacos: '', productor: 'CAFFE SAC', sku: '', fechas: '' },
+  { id: 2, codigo: 'LF2', nombre: 'ORO VERDE 3', producto: 'ORO',       cantidad: '', sacos: '', productor: 'JUAN',      sku: '', fechas: '' },
 ];
 
 interface Props {
@@ -93,7 +93,7 @@ export function AlistadoAsignacionLotesModal({ orden, onClose, onGoToStep }: Pro
             <table className="w-full text-xs border-collapse min-w-[780px]">
               <thead>
                 <tr style={{ backgroundColor: BG }}>
-                  {['CÓDIGO','NOMBRE DEL LOTE','PRODUCTO','CANTIDAD','# SACOS','PRODUCTOR','FECHAS DE PROCESO','ACCIONES'].map(h => (
+                  {['CÓDIGO','NOMBRE DEL LOTE','PRODUCTO','CANTIDAD','# SACOS','PRODUCTOR','SKU','FECHAS DE PROCESO','ACCIONES'].map(h => (
                     <th key={h} className="text-[0.6rem] font-black uppercase tracking-wide text-center py-2.5 px-3" style={{ color: CP, borderBottom: `2px solid ${BD}` }}>{h}</th>
                   ))}
                 </tr>
@@ -114,6 +114,11 @@ export function AlistadoAsignacionLotesModal({ orden, onClose, onGoToStep }: Pro
                     </td>
                     <td className="py-2 px-3 text-center" style={{ color: TX }}>{l.productor}</td>
                     <td className="py-2 px-3 text-center">
+                      {l.sku
+                        ? <span className="px-2 py-0.5 rounded-full text-[0.58rem] font-bold bg-green-50 text-green-700">{l.sku}</span>
+                        : <span className="text-gray-400">—</span>}
+                    </td>
+                    <td className="py-2 px-3 text-center">
                       <input type="text" value={l.fechas} onChange={e => updateLote(l.id,'fechas',e.target.value)}
                         className="w-28 border rounded-full px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-green-500" style={{ borderColor: BD }} placeholder="dd/mm/aaaa" />
                     </td>
@@ -125,7 +130,7 @@ export function AlistadoAsignacionLotesModal({ orden, onClose, onGoToStep }: Pro
                   </tr>
                 ))}
                 {filtrados.length === 0 && (
-                  <tr><td colSpan={8} className="py-8 text-center text-xs text-gray-400">{busqLotes ? `Sin resultados para "${busqLotes}"` : 'Sin lotes asignados'}</td></tr>
+                  <tr><td colSpan={9} className="py-8 text-center text-xs text-gray-400">{busqLotes ? `Sin resultados para "${busqLotes}"` : 'Sin lotes asignados'}</td></tr>
                 )}
               </tbody>
             </table>

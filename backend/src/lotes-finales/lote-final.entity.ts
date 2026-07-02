@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { TipoProducto } from '../tipos-producto/tipo-producto.entity';
 import { Campana } from '../campanas/campana.entity';
+import { Sku } from '../skus/sku.entity';
 
 export enum LoteFinalTipoOrigen {
   DIRECTO  = 'DIRECTO',   
@@ -60,6 +61,14 @@ export class LoteFinal {
 
   @Column({ type: 'date', nullable: true })
   fechaCreacion: string | null;
+
+  @Index()
+  @Column({ nullable: true })
+  skuId: number | null;
+
+  @ManyToOne(() => Sku, { eager: false, onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'skuId' })
+  sku: Sku;
 
   @Column({ type: 'text', nullable: true })
   observaciones: string | null;

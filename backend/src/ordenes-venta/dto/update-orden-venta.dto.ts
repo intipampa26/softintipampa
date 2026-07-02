@@ -27,6 +27,9 @@ export class UpdateOrdenVentaDto {
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0)
   montoUSD?: number;
 
+  @IsOptional() @IsString()
+  moneda?: string;
+
   @IsOptional() @IsDateString()
   fecha?: string;
 

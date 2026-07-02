@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { KpiCard } from '@/components/dashboard/KpiCard';
@@ -6,7 +6,7 @@ import { FiltroDashboard } from '@/components/dashboard/FiltroDashboard';
 import { AcopioSection } from '@/components/dashboard/AcopioSection';
 import { TrillaSection } from '@/components/dashboard/TrillaSection';
 import { VentasSection } from '@/components/dashboard/VentasSection';
-import type { FiltroAño } from '@/types/dashboard.types';
+import { campanasService } from '@/services/campanas.service';
 
 const CP = '#445D46';
 const TX = '#2C2C2C';
@@ -56,10 +56,17 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export function DashboardPage() {
   const { isOfflineSession } = useAuth();
-  const { acopio, trilla, ventas, loading, error, refetch } = useDashboardData();
-  const [año, setAño] = useState<FiltroAño>('ambos');
+  const [campanaId, setCampanaId] = useState<number | null>(null);
+  const [campanas, setCampanas] = useState<{ id: number; nombre: string }[]>([]);
+  const { acopio, trilla, ventas, loading, error, refetch } = useDashboardData(campanaId ?? undefined);
   const [almacen, setAlmacen] = useState('todos');
   const [seccion, setSeccion] = useState<Seccion>('acopio');
+
+  useEffect(() => {
+    campanasService.getPage(1, 100).then(res => {
+      setCampanas((res.data ?? []).map((c: any) => ({ id: c.id, nombre: c.nombre })));
+    }).catch(() => {});
+  }, []);
 
   const almacenes = useMemo(() => {
     const set = new Set<string>();
@@ -115,27 +122,18 @@ export function DashboardPage() {
       )}
 
       {!loading && !error && acopio && trilla && ventas && (() => {
-        const kg2024  = acopio.totalKgPorAño.find(y => y.año === 2024)?.kg ?? 0;
-        const kg2025  = acopio.totalKgPorAño.find(y => y.año === 2025)?.kg ?? 0;
-        const fob2024 = ventas.totalFOBPorAño.find(y => y.año === 2024)?.usd ?? 0;
-        const fob2025 = ventas.totalFOBPorAño.find(y => y.año === 2025)?.usd ?? 0;
-
-        const totalAcopio = año === '2024' ? kg2024 : año === '2025' ? kg2025 : acopio.totalKgPergamino;
-        const totalFOB    = año === '2024' ? fob2024 : año === '2025' ? fob2025 : ventas.totalFOB;
-        const deltaAcopio = kg2024 > 0 ? ((kg2025 - kg2024) / kg2024) * 100 : undefined;
-        const deltaFOB    = fob2024 > 0 ? ((fob2025 - fob2024) / fob2024) * 100 : undefined;
-
-        const prod2024 = acopio.conteoProductores.find(r => r.año === 2024)?.conteo ?? 0;
-        const prod2025 = acopio.conteoProductores.find(r => r.año === 2025)?.conteo ?? 0;
-        const totalProd = año === '2024' ? prod2024 : año === '2025' ? prod2025 : prod2024 + prod2025;
+        const totalAcopio = acopio.totalKgPergamino;
+        const totalFOB    = ventas.totalFOB;
+        const totalProd   = acopio.conteoProductores.reduce((s, r) => s + r.conteo, 0);
 
         return (
           <>
             <FiltroDashboard
-              año={año}
+              campanaId={campanaId}
+              campanas={campanas}
               almacen={almacen}
               almacenes={almacenes}
-              onAñoChange={a => { setAño(a); setAlmacen('todos'); }}
+              onCampanaChange={id => { setCampanaId(id); setAlmacen('todos'); }}
               onAlmacenChange={setAlmacen}
             />
 
@@ -143,14 +141,12 @@ export function DashboardPage() {
               <KpiCard
                 label="Total Acopio"
                 value={fmtK(totalAcopio)}
-                sub={año === 'ambos' ? `2024: ${fmtK(kg2024)} · 2025: ${fmtK(kg2025)}` : `Global: ${fmtK(acopio.totalKgPergamino)}`}
-                delta={año === 'ambos' ? deltaAcopio : undefined}
+                sub={campanaId ? `Campaña ${campanas.find(c => c.id === campanaId)?.nombre ?? campanaId}` : 'Todas las campañas'}
               />
               <KpiCard
                 label="Ventas FOB"
                 value={fmtU(totalFOB)}
-                sub={año === 'ambos' ? `2024: ${fmtU(fob2024)} · 2025: ${fmtU(fob2025)}` : ''}
-                delta={año === 'ambos' ? deltaFOB : undefined}
+                sub={campanaId ? `Campaña ${campanas.find(c => c.id === campanaId)?.nombre ?? campanaId}` : 'Todas las campañas'}
               />
               <KpiCard
                 label="Rend. Trilla Prom."
@@ -160,7 +156,7 @@ export function DashboardPage() {
               <KpiCard
                 label="Productores Activos"
                 value={String(totalProd)}
-                sub={año === 'ambos' ? `2024: ${prod2024} · 2025: ${prod2025}` : `Campaña ${año}`}
+                sub={campanaId ? `Campaña ${campanas.find(c => c.id === campanaId)?.nombre ?? campanaId}` : 'Todas las campañas'}
               />
             </div>
 
@@ -251,9 +247,9 @@ export function DashboardPage() {
               <SectionTitle>
                 {seccion === 'acopio' ? 'Acopio' : seccion === 'trilla' ? 'Trilla' : 'Ventas'}
               </SectionTitle>
-              {seccion === 'acopio' && <AcopioSection data={acopio} año={año} almacen={almacen} />}
-              {seccion === 'trilla' && <TrillaSection data={trilla} año={año} almacen={almacen} />}
-              {seccion === 'ventas' && <VentasSection data={ventas} año={año} />}
+              {seccion === 'acopio' && <AcopioSection data={acopio} almacen={almacen} />}
+              {seccion === 'trilla' && <TrillaSection data={trilla} almacen={almacen} />}
+              {seccion === 'ventas' && <VentasSection data={ventas} />}
             </div>
           </>
         );

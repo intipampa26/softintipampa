@@ -31,5 +31,7 @@ export class TrillarDto {
    
   @IsNumber() @Min(0) @Type(() => Number) sobranteExportableKg: number;
 
+  @IsInt() @IsOptional() @Type(() => Number) skuId?: number;
+
   @IsString() @IsOptional() observaciones?: string;
 }

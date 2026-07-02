@@ -6,8 +6,8 @@ export class CreateOrdenVentaDto {
   @IsString() @IsNotEmpty()
   cliente: string;
 
-  @IsString() @IsNotEmpty()
-  productor: string;
+  @IsOptional() @IsString()
+  productor?: string;
 
   @IsOptional() @IsString()
   campana?: string;
@@ -26,6 +26,9 @@ export class CreateOrdenVentaDto {
 
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0)
   montoUSD?: number;
+
+  @IsOptional() @IsString()
+  moneda?: string;
 
   @IsOptional() @IsDateString()
   fecha?: string;

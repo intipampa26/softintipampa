@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { LoteFinal } from './lote-final.entity';
 import { LoteFinalOrigen } from './lote-final-origen.entity';
 import { Trillado } from '../trillado/trillado.entity';
+import { Sku } from '../skus/sku.entity';
 import { LotesFinalesService } from './lotes-finales.service';
 import { LotesFinalesController } from './lotes-finales.controller';
 import { KardexModule }   from '../kardex/kardex.module';
@@ -10,7 +11,7 @@ import { MermasModule }  from '../mermas/mermas.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([LoteFinal, LoteFinalOrigen, Trillado]),
+    TypeOrmModule.forFeature([LoteFinal, LoteFinalOrigen, Trillado, Sku]),
     KardexModule,
     MermasModule,
   ],

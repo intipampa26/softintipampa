@@ -115,6 +115,36 @@ export class OrdenesVentaController {
     return this.service.upsertAlistado(id, dto);
   }
 
+  @Post(':id/alistado/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req: any, _file: any, cb: any) => {
+          const dir = join(process.cwd(), 'uploads', 'alistado', req.params.id);
+          mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (_req: any, file: any, cb: any) => {
+          const uniquePrefix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+          cb(null, `${uniquePrefix}${extname(file.originalname)}`);
+        },
+      }),
+      limits: { fileSize: 20 * 1024 * 1024 },
+    }),
+  )
+  uploadAlistadoContrato(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: any,
+  ) {
+    return this.service.uploadAlistadoContrato(id, file);
+  }
+
+  @Delete(':id/alistado/upload')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteAlistadoContrato(@Param('id', ParseIntPipe) id: number) {
+    return this.service.deleteAlistadoContrato(id);
+  }
+
   @Get(':id/exportacion')
   getExportacion(@Param('id', ParseIntPipe) id: number) {
     return this.service.getExportacion(id);

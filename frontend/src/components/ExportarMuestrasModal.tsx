@@ -3,6 +3,7 @@ import { muestrasService, Muestra, TipoMuestra, EstadoMuestra } from '@/services
 import { campanasService, Campana } from '@/services/campanas.service';
 import { productoresService, Productor } from '@/services/productores.service';
 import LoadingLogo from '@/components/LoadingLogo';
+import { useToast } from '@/contexts/ToastContext';
 
 interface ExcelRow {
   Codigo: string; Fecha: string; FechaCata: string; Tipo: string; CategoriaMuestra: string;
@@ -65,7 +66,7 @@ export function ExportarMuestrasModal({ onClose }: Props) {
   const [loading,     setLoading]     = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [searched,    setSearched]    = useState(false);
-  const [error,       setError]       = useState('');
+  const toast = useToast();
 
   useEffect(() => {
     campanasService.getPage(1, 100).then(r => setCampanas(r.data));
@@ -86,12 +87,12 @@ export function ExportarMuestrasModal({ onClose }: Props) {
   }), [filterCampanaId, filterProductorId, filterTipo, filterEstado, filterLote]);
 
   async function handleBuscar() {
-    setLoading(true); setError(''); setSearched(false);
+    setLoading(true); setSearched(false);
     try {
       const result = await muestrasService.getPage(buildParams());
       setRows(result.data.map(muestraToRow));
       setSearched(true);
-    } catch { setError('Error al cargar datos.'); }
+    } catch { toast.error('Error al cargar datos.'); }
     finally { setLoading(false); }
   }
 
@@ -104,7 +105,7 @@ export function ExportarMuestrasModal({ onClose }: Props) {
       const a    = document.createElement('a');
       a.href = url; a.download = 'muestras.xlsx'; a.click();
       URL.revokeObjectURL(url);
-    } catch { setError('Error al descargar el Excel.'); }
+    } catch { toast.error('Error al descargar el Excel.'); }
     finally { setDownloading(false); }
   }
 
@@ -170,7 +171,7 @@ export function ExportarMuestrasModal({ onClose }: Props) {
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
                 style={{ backgroundColor: '#1A2B23' }}>
                 {loading
-                  ? <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4}/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                  ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
                   : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35"/></svg>
                 }
                 {loading ? 'Buscando…' : 'Buscar'}
@@ -180,7 +181,7 @@ export function ExportarMuestrasModal({ onClose }: Props) {
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
                   style={{ backgroundColor: '#2d5a3d' }}>
                   {downloading
-                    ? <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4}/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                    ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
                     : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                   }
                   {downloading ? 'Descargando…' : `Descargar Excel (${rows.length})`}
@@ -188,7 +189,6 @@ export function ExportarMuestrasModal({ onClose }: Props) {
               )}
             </div>
           </div>
-          {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
         </div>
 
         <div className="flex-1 overflow-auto px-6 py-4">

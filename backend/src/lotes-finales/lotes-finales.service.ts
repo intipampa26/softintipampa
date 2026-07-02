@@ -63,7 +63,7 @@ export class LotesFinalesService {
 
     return paginate(this.lfRepo, filter, {
       where,
-      relations: ['tipoProducto', 'campana'],
+      relations: ['tipoProducto', 'campana', 'sku'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -71,7 +71,7 @@ export class LotesFinalesService {
   async findOne(id: number): Promise<LoteFinal> {
     const lf = await this.lfRepo.findOne({
       where: { id },
-      relations: ['tipoProducto', 'campana'],
+      relations: ['tipoProducto', 'campana', 'sku'],
     });
     if (!lf) throw new NotFoundException(`LoteFinal #${id} no encontrado`);
     return lf;
@@ -148,9 +148,22 @@ export class LotesFinalesService {
     const savedTrillado = await this.trilladoRepo.save(trillado);
 
     
-    await this.lfRepo.update(id, { estado: LoteFinalEstado.TRILLADO });
+    await this.lfRepo.update(id, {
+      estado: LoteFinalEstado.TRILLADO,
+      ...(dto.skuId != null ? { skuId: dto.skuId } : {}),
+    });
 
     
+    await this.kardexService.registrar({
+      loteFinalId:    id,
+      tipoMovimiento: TipoMovimientoKardex.INGRESO,
+      cantidadKg:     parseFloat(Number(dto.pesoPfKg).toFixed(3)),
+      referenciaTipo: ReferenciaTipoKardex.TRILLADO,
+      referenciaId:   savedTrillado.id,
+      fecha:          dto.fecha,
+      observaciones:  `Ingreso trillado — Oro verde: ${dto.pesoPfKg} kg`,
+    });
+
     const mermaTotal = Number(dto.mermaReutilizableKg) + Number(dto.mermaDesechableKg);
     if (mermaTotal > 0) {
       await this.kardexService.registrar({

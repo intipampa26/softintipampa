@@ -33,7 +33,7 @@ export class KardexService {
   private async saldoActual(loteFinalId: number): Promise<number> {
     const ultimo = await this.repo.findOne({
       where: { loteFinalId },
-      order: { createdAt: 'DESC', id: 'DESC' },
+      order: { horaEntrada: 'DESC', createdAt: 'DESC', id: 'DESC' },
     });
     return ultimo ? Number(ultimo.saldoKg) : 0;
   }
@@ -70,7 +70,7 @@ export class KardexService {
   findByLoteFinal(loteFinalId: number): Promise<MovimientoKardex[]> {
     return this.repo.find({
       where: { loteFinalId },
-      order: { fecha: 'ASC', createdAt: 'ASC' },
+      order: { fecha: 'ASC', horaEntrada: 'ASC', createdAt: 'ASC', id: 'ASC' },
     });
   }
 
@@ -85,7 +85,8 @@ export class KardexService {
       .leftJoinAndSelect('m.loteFinal', 'lf')
       .leftJoinAndSelect('lf.tipoProducto', 'tp')
       .leftJoinAndSelect('lf.campana', 'campana')
-      .orderBy('m.fecha', 'DESC')
+      .orderBy('m.horaEntrada', 'DESC')
+      .addOrderBy('m.createdAt', 'DESC')
       .addOrderBy('m.id', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);

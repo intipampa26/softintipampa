@@ -11,7 +11,7 @@ interface DashboardData {
   refetch: () => void;
 }
 
-export function useDashboardData(): DashboardData {
+export function useDashboardData(campanaId?: number): DashboardData {
   const [acopio, setAcopio] = useState<AcopioResumen | null>(null);
   const [trilla, setTrilla] = useState<TrillaResumen | null>(null);
   const [ventas, setVentas] = useState<VentasResumen | null>(null);
@@ -24,10 +24,12 @@ export function useDashboardData(): DashboardData {
     setLoading(true);
     setError(null);
 
+    const params = campanaId ? { campanaId } : {};
+
     Promise.all([
-      api.get<AcopioResumen>('/reportes/acopio/resumen'),
-      api.get<TrillaResumen>('/reportes/trilla/resumen'),
-      api.get<VentasResumen>('/reportes/ventas/resumen'),
+      api.get<AcopioResumen>('/reportes/acopio/resumen', { params }),
+      api.get<TrillaResumen>('/reportes/trilla/resumen', { params }),
+      api.get<VentasResumen>('/reportes/ventas/resumen', { params }),
     ])
       .then(([a, t, v]) => {
         if (cancelled) return;
@@ -43,7 +45,7 @@ export function useDashboardData(): DashboardData {
       });
 
     return () => { cancelled = true; };
-  }, [tick]);
+  }, [tick, campanaId]);
 
   return { acopio, trilla, ventas, loading, error, refetch: () => setTick(t => t + 1) };
 }

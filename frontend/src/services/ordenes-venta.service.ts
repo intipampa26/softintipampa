@@ -15,17 +15,19 @@ export interface OrdenVentaFE {
   destino:      string;
   tipoProducto: string;
   montoUSD:     number;
+  moneda:       string;
 }
 
 export interface CreateOrdenDto {
   cliente:       string;
-  productor:     string;
+  productor?:    string;
   campana?:      string;
   lote?:         string;
   cantidadKg?:   number;
   destino?:      string;
   tipoProducto?: string;
   montoUSD?:     number;
+  moneda?:       string;
   fecha?:        string;
   etapaActual?:  string;
 }
@@ -54,6 +56,7 @@ function mapResponse(raw: any): OrdenVentaFE {
     destino:      raw.destino      ?? '',
     tipoProducto: raw.tipoProducto ?? '',
     montoUSD:     Number(raw.montoUSD     ?? 0),
+    moneda:       raw.moneda              ?? 'USD',
   };
 }
 
@@ -136,6 +139,19 @@ export const ordenesVentaService = {
     return unwrap(r);
   },
 
+  async uploadAlistadoContrato(id: number, file: File): Promise<{ contratoFileName: string; contratoFilePath: string }> {
+    const form = new FormData();
+    form.append('file', file);
+    const r = await api.post(`/ordenes-venta/${id}/alistado/upload`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return unwrap(r);
+  },
+
+  async deleteAlistadoContrato(id: number): Promise<void> {
+    await api.delete(`/ordenes-venta/${id}/alistado/upload`);
+  },
+
   async getExportacion(id: number): Promise<any> {
     const r = await api.get(`/ordenes-venta/${id}/exportacion`);
     return unwrap(r);
@@ -174,5 +190,9 @@ export const ordenesVentaService = {
   async upsertPostVenta(id: number, dto: Record<string, unknown>): Promise<any> {
     const r = await api.put(`/ordenes-venta/${id}/post-venta`, dto);
     return unwrap(r);
+  },
+
+  async updateEtapa(id: number, etapa: string, estado: string, fecha?: string): Promise<void> {
+    await api.patch(`/ordenes-venta/${id}/etapa`, { etapa, estado, fecha });
   },
 };

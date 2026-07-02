@@ -102,6 +102,42 @@ export class OrdenesVentaService {
 
   async updateEtapa(id: number, dto: UpdateEtapaDto): Promise<OrdenVenta> {
     const ov = await this.findOne(id);
+
+    if (
+      dto.etapa === EtapaOrden.EXPORTACION &&
+      (dto.estado === EstadoEtapa.EN_PROCESO || dto.estado === EstadoEtapa.COMPLETADO) &&
+      ov.lote &&
+      Number(ov.cantidadKg) > 0
+    ) {
+      const loteFinal = await this.loteFinalRepo.findOne({ where: { codigo: ov.lote } });
+      if (loteFinal) {
+        const yaRegistrado = await this.kardexService.netSalidaPorReferencia(
+          ReferenciaTipoKardex.VENTA,
+          id,
+          loteFinal.id,
+        );
+        if (yaRegistrado === 0) {
+          const mov = await this.kardexService.registrar({
+            loteFinalId:    loteFinal.id,
+            tipoMovimiento: TipoMovimientoKardex.SALIDA,
+            cantidadKg:     Number(ov.cantidadKg),
+            referenciaTipo: ReferenciaTipoKardex.VENTA,
+            referenciaId:   id,
+            fecha:          dto.fecha ?? new Date().toISOString().slice(0, 10),
+            observaciones:  `Venta exportación ${ov.codigo} — ${ov.cliente}`,
+          });
+          // Auto-fill kardexNro and kardexRegistrado in orden_exportacion
+          let exp = await this.exportacionRepo.findOne({ where: { ordenVentaId: id } });
+          if (!exp) {
+            exp = this.exportacionRepo.create({ ordenVentaId: id });
+          }
+          exp.kardexNro        = String(mov.id);
+          exp.kardexRegistrado = true;
+          await this.exportacionRepo.save(exp);
+        }
+      }
+    }
+
     ov.etapas = {
       ...ov.etapas,
       [dto.etapa]: {
@@ -110,7 +146,10 @@ export class OrdenesVentaService {
         fecha:      dto.fecha      ?? ov.etapas[dto.etapa]?.fecha      ?? null,
       },
     };
-    if (dto.estado === EstadoEtapa.EN_PROCESO || dto.estado === EstadoEtapa.COMPLETADO) {
+    const ETAPA_ORDER = ['preventa', 'alistado', 'exportacion', 'post_venta'];
+    const currentIdx  = ETAPA_ORDER.indexOf(ov.etapaActual ?? 'preventa');
+    const newIdx      = ETAPA_ORDER.indexOf(dto.etapa);
+    if ((dto.estado === EstadoEtapa.EN_PROCESO || dto.estado === EstadoEtapa.COMPLETADO) && newIdx >= currentIdx) {
       ov.etapaActual = dto.etapa;
     }
     return this.repo.save(ov);
@@ -311,6 +350,35 @@ export class OrdenesVentaService {
       try { unlinkSync(filePath); } catch { /* already gone */ }
     }
     return updated;
+  }
+
+  async uploadAlistadoContrato(
+    ordenId: number,
+    file: any,
+  ): Promise<{ contratoFileName: string; contratoFilePath: string }> {
+    await this.findOne(ordenId);
+    let row = await this.alistadoRepo.findOne({ where: { ordenVentaId: ordenId } });
+    if (!row) row = this.alistadoRepo.create({ ordenVentaId: ordenId });
+    // Delete previous file if exists
+    if (row.contratoFilePath) {
+      const prev = join(process.cwd(), 'uploads', 'alistado', String(ordenId), row.contratoFilePath);
+      if (existsSync(prev)) { try { unlinkSync(prev); } catch { /* gone */ } }
+    }
+    row.contratoFileName = file.originalname as string;
+    row.contratoFilePath = file.filename as string;
+    await this.alistadoRepo.save(row);
+    return { contratoFileName: row.contratoFileName!, contratoFilePath: row.contratoFilePath! };
+  }
+
+  async deleteAlistadoContrato(ordenId: number): Promise<void> {
+    await this.findOne(ordenId);
+    const row = await this.alistadoRepo.findOne({ where: { ordenVentaId: ordenId } });
+    if (!row || !row.contratoFilePath) return;
+    const filePath = join(process.cwd(), 'uploads', 'alistado', String(ordenId), row.contratoFilePath);
+    if (existsSync(filePath)) { try { unlinkSync(filePath); } catch { /* gone */ } }
+    row.contratoFileName = null;
+    row.contratoFilePath = null;
+    await this.alistadoRepo.save(row);
   }
 
   async getPostVenta(ordenId: number): Promise<OrdenPostVenta | null> {

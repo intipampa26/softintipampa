@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ClipboardList, FileDown, RotateCcw, Save } from 'lucide-react';
 import LoadingLogo from '@/components/LoadingLogo';
+import { useToast } from '@/contexts/ToastContext';
 import { Muestra } from '@/services/muestras.service';
 import { EvaluacionFisicaContent } from '@/components/EvaluacionFisicaContent';
 
@@ -16,6 +17,7 @@ interface Props {
 export function EvaluacionFisicaModal({ muestra, onClose, onGuardado }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving,  setSaving]  = useState(false);
+  const toast = useToast();
 
   return (
     <div
@@ -67,7 +69,7 @@ export function EvaluacionFisicaModal({ muestra, onClose, onGuardado }: Props) {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => alert('Exportar PDF — próximamente')}
+              onClick={() => toast.info('Exportar PDF — próximamente')}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-semibold transition-colors"
               style={{ borderColor: '#6EE7B7', backgroundColor: '#F0FDF4', color: CS }}
             >

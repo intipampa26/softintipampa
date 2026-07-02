@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { muestrasService } from '@/services/muestras.service';
 import LoadingLogo from '@/components/LoadingLogo';
+import { useToast } from '@/contexts/ToastContext';
 
 type PreviewRow = Record<string, unknown>;
 
@@ -16,37 +17,37 @@ export function ImportarMuestrasModal({ onClose, onImportado }: Props) {
   const [parsing,   setParsing]   = useState(false);
   const [uploading, setUploading] = useState(false);
   const [result,    setResult]    = useState<{ creadas: number; actualizadas: number; errores: string[] } | null>(null);
-  const [error,     setError]     = useState('');
+  const toast = useToast();
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    setFile(f); setResult(null); setError(''); setParsing(true);
+    setFile(f); setResult(null); setParsing(true);
     try {
       const buffer = await f.arrayBuffer();
       const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const data: PreviewRow[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      if (!data.length) { setError('El archivo está vacío o sin formato válido.'); return; }
+      if (!data.length) { toast.error('El archivo está vacío o sin formato válido.'); return; }
       setHeaders(Object.keys(data[0]));
       setRows(data.slice(0, 50));
-    } catch { setError('No se pudo leer el archivo. Verifica que sea .xlsx o .csv válido.'); }
+    } catch { toast.error('No se pudo leer el archivo. Verifica que sea .xlsx o .csv válido.'); }
     finally { setParsing(false); }
   }
 
   async function handleSubir() {
     if (!file) return;
-    setUploading(true); setError('');
+    setUploading(true);
     try {
       const res = await muestrasService.importHistorico(file);
       setResult(res);
       onImportado?.();
-    } catch { setError('Error al importar. Verifica el formato del archivo.'); }
+    } catch { toast.error('Error al importar. Verifica el formato del archivo.'); }
     finally { setUploading(false); }
   }
 
   function handleReset() {
-    setFile(null); setHeaders([]); setRows([]); setResult(null); setError('');
+    setFile(null); setHeaders([]); setRows([]); setResult(null);
     if (inputRef.current) inputRef.current.value = '';
   }
 
@@ -97,7 +98,7 @@ export function ImportarMuestrasModal({ onClose, onImportado }: Props) {
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50 shrink-0"
                 style={{ backgroundColor: '#2d5a3d' }}>
                 {uploading
-                  ? <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4}/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>Importando…</>
+                  ? <><span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />Importando…</>
                   : <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>Confirmar importación</>
                 }
               </button>
@@ -107,7 +108,6 @@ export function ImportarMuestrasModal({ onClose, onImportado }: Props) {
           <p className="text-xs text-gray-400">
             Columnas esperadas: <span className="font-mono text-gray-600">Codigo, Fecha, TipoMuestra, ProductorId, CampanaId, Puntaje, Resultado, Observaciones</span>
           </p>
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>}
         </div>
 
         <div className="flex-1 overflow-auto px-6 py-5">

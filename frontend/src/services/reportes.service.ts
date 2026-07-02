@@ -15,29 +15,52 @@ export interface ResumenReporte {
   kpis:    ResumenKpis;
 }
 
+export interface ExportFilters {
+  campanaId?:  number;
+  sku?:        string;
+  fecha?:      string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  almacen?:    string;
+}
+
 const BASE = '/reportes';
 
 export const reportesService = {
+  async getFilterOptions(): Promise<{ almacenes: string[] }> {
+    const { data } = await api.get(`${BASE}/filter-options`);
+    return data;
+  },
+
   async getResumen(campanaId?: number): Promise<ResumenReporte> {
     const params = campanaId ? { campanaId } : {};
     const { data } = await api.get(`${BASE}/resumen`, { params });
     return data;
   },
 
-  downloadExcel(tipo: 'productores' | 'lotes' | 'lotes-finales', campanaId?: number) {
+  downloadExcel(
+    tipo: 'productores' | 'lotes' | 'lotes-finales' | 'muestras' | 'ventas',
+    filters: ExportFilters = {},
+    filename?: string,
+  ) {
     const token = storageService.getAccessToken();
-    const qs    = campanaId ? `?campanaId=${campanaId}` : '';
-    const url   = `/api/reportes/export/${tipo}${qs}`;
+    const params = new URLSearchParams();
+    if (filters.campanaId)  params.set('campanaId',  String(filters.campanaId));
+    if (filters.sku)        params.set('sku',        filters.sku);
+    if (filters.fecha)      params.set('fecha',      filters.fecha);
+    if (filters.fechaDesde) params.set('fechaDesde', filters.fechaDesde);
+    if (filters.fechaHasta) params.set('fechaHasta', filters.fechaHasta);
+    if (filters.almacen)    params.set('almacen',    filters.almacen);
+    const qs  = params.toString() ? `?${params.toString()}` : '';
+    const url = `/api/reportes/export/${tipo}${qs}`;
 
-    const a = document.createElement('a');
-    a.href = url;
-    
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.blob())
       .then(blob => {
         const blobUrl = URL.createObjectURL(blob);
-        a.href = blobUrl;
-        a.download = `${tipo}.xlsx`;
+        const a = document.createElement('a');
+        a.href     = blobUrl;
+        a.download = `${filename ?? tipo}.xlsx`;
         a.click();
         URL.revokeObjectURL(blobUrl);
       });

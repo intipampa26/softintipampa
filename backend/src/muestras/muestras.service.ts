@@ -128,20 +128,6 @@ export class MuestrasService {
     const codigo  = await this.generateCodigo();
     const muestra = this.repo.create({ ...dto, codigo });
     const saved   = await this.repo.save(muestra);
-
-    if (saved.loteFinalId && saved.cantidadKg) {
-      const fecha = saved.fechaRegistro ?? new Date().toISOString().slice(0, 10);
-      await this.kardexService.registrar({
-        loteFinalId:    saved.loteFinalId,
-        tipoMovimiento: TipoMovimientoKardex.SALIDA,
-        cantidadKg:     Number(saved.cantidadKg),
-        referenciaTipo: ReferenciaTipoKardex.MUESTRA,
-        referenciaId:   saved.id,
-        fecha,
-        observaciones:  `Envío de muestra ${saved.codigo}`,
-      });
-    }
-
     return saved;
   }
 
@@ -152,21 +138,8 @@ export class MuestrasService {
   }
 
   async remove(id: number): Promise<void> {
-    const muestra = await this.findOne(id);
+    await this.findOne(id);
     await this.repo.update(id, { activo: false });
-
-    if (muestra.loteFinalId && muestra.cantidadKg) {
-      const fecha = muestra.fechaRegistro ?? new Date().toISOString().slice(0, 10);
-      await this.kardexService.registrar({
-        loteFinalId:    muestra.loteFinalId,
-        tipoMovimiento: TipoMovimientoKardex.INGRESO,
-        cantidadKg:     Number(muestra.cantidadKg),
-        referenciaTipo: ReferenciaTipoKardex.MUESTRA,
-        referenciaId:   muestra.id,
-        fecha,
-        observaciones:  `Reversa eliminación muestra ${muestra.codigo}`,
-      });
-    }
   }
 
   

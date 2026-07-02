@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Parcela } from '@/services/parcelas.service';
 import { parcelasCampanaService, ParcelaCampana } from '@/services/parcelas-campana.service';
+import { useToast } from '@/contexts/ToastContext';
 
 type SnapFields = Omit<ParcelaCampana, 'id' | 'parcelaId' | 'campanaId' | 'campana' | 'createdAt' | 'updatedAt'>;
 
@@ -76,8 +77,8 @@ export function ParcelaCampanaForm({
   const [loading, setLoading]  = useState(true);
   const [saving, setSaving]    = useState(false);
   const [saved, setSaved]      = useState(false);
-  const [error, setError]      = useState('');
   const [hasSavedSnap, setHasSavedSnap] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     setLoading(true);
@@ -107,7 +108,6 @@ export function ParcelaCampanaForm({
 
   async function handleSave() {
     setSaving(true);
-    setError('');
     const result = await parcelasCampanaService.upsert({ parcelaId, campanaId, ...fields });
     setSaving(false);
     if (result) {
@@ -116,7 +116,7 @@ export function ParcelaCampanaForm({
       setTimeout(() => setSaved(false), 3000);
       onSaved?.(result);
     } else {
-      setError('Error al guardar. Intenta de nuevo.');
+      toast.error('Error al guardar. Intenta de nuevo.');
     }
   }
 
@@ -397,9 +397,6 @@ export function ParcelaCampanaForm({
           value={strV(fields.observacionesCampana)} onChange={strF('observacionesCampana')} />
       </Sec>
 
-      {error && (
-        <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-xl">{error}</p>
-      )}
       {saved && (
         <p className="text-xs text-green-700 bg-green-50 px-3 py-2 rounded-xl flex items-center gap-1.5">
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -416,10 +413,7 @@ export function ParcelaCampanaForm({
         style={{ backgroundColor: '#1A2B23', color: '#fff' }}
       >
         {saving ? (
-          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-          </svg>
+          <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
         ) : (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5"/>

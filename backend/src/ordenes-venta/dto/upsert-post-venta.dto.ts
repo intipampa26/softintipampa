@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNumber, IsDateString, IsInt } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsDateString, IsInt, Min, Max } from 'class-validator';
 
 export class UpsertPostVentaDto {
   @IsOptional() @IsString()  nroFactura?: string;
@@ -12,7 +12,7 @@ export class UpsertPostVentaDto {
   @IsOptional() @IsString()  observCierre?: string;
 
   @IsOptional() @IsDateString() fechaFeedback?: string;
-  @IsOptional() @IsInt()     rating?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(5) rating?: number;
   @IsOptional() @IsString()  comentCalidad?: string;
   @IsOptional() @IsString()  comentServicio?: string;
   @IsOptional() @IsString()  recomendaria?: string;

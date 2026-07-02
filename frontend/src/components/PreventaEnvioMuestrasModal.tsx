@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Calendar, ChevronDown, Search, Send } from 'lucide-react';
+import { clientesService, Cliente } from '@/services/clientes.service';
 import { StatusCards } from './flow/StatusCards';
 import { StepKey }    from '@/contexts/FlowContext';
 
@@ -35,10 +36,6 @@ const MOCK_MUESTRAS: MuestraMock[] = [
   { id: 5, codigo: 'M0005', lote: 'LF-2026-005', campana: 'C.2025/26', productor: 'Luis Vargas',  cantidad: '', tipoMuestra: 'Granel',  fecha: '15/01/2026', costos: '' },
 ];
 
-const CLIENTES_MOCK = [
-  'Volcafe Perú S.A.C.', 'Sucafina S.A.', 'Olam International',
-  'Nordic Approach AS', 'Caravela Coffee LLC', 'Trabocca B.V.',
-];
 
 const INP = 'w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600 transition-all';
 const inpStyle = { borderColor: BD, color: TX };
@@ -71,8 +68,19 @@ export function PreventaEnvioMuestrasModal({ orden, onClose, onGoToStep }: Preve
   const [costoCourier,        setCostoCourier]        = useState('');
   const [fitosanitario,       setFitosanitario]       = useState<'si' | 'no' | ''>('');
   const [busqueda,            setBusqueda]            = useState('');
-  
+  const [clientes,            setClientes]            = useState<Cliente[]>([]);
+
   const [muestras, setMuestras] = useState<MuestraMock[]>(MOCK_MUESTRAS);
+
+  useEffect(() => {
+    clientesService.getPage(1, 200).then(r => setClientes(r.data)).catch(() => {});
+  }, []);
+
+  function handleClienteChange(nombre: string) {
+    setClienteSeleccionado(nombre);
+    const cliente = clientes.find(c => c.nombre === nombre);
+    setRucDni(cliente?.nroDocumento ?? '');
+  }
 
   const muestrasFiltradas = muestras.filter(m => {
     const q = busqueda.toLowerCase();
@@ -161,9 +169,9 @@ export function PreventaEnvioMuestrasModal({ orden, onClose, onGoToStep }: Preve
             <div>
               {fieldLabel('Razón social / Cliente')}
               <div className="relative">
-                <select value={clienteSeleccionado} onChange={e => setClienteSeleccionado(e.target.value)} className={`${INP} pr-9 appearance-none`} style={inpStyle}>
+                <select value={clienteSeleccionado} onChange={e => handleClienteChange(e.target.value)} className={`${INP} pr-9 appearance-none`} style={inpStyle}>
                   <option value="">Seleccionar cliente…</option>
-                  {CLIENTES_MOCK.map(c => <option key={c} value={c}>{c}</option>)}
+                  {clientes.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                 </select>
                 <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>

@@ -3,6 +3,18 @@ import { Type } from 'class-transformer';
 import { LoteEstado } from '../lote.entity';
 
 export class UpdateLoteDto {
+  @IsInt() @Min(1) @IsOptional() @Type(() => Number)
+  tipoProductoId?: number;
+
+  @IsInt() @Min(1) @IsOptional() @Type(() => Number)
+  campanaId?: number;
+
+  @IsInt() @Min(1) @IsOptional() @Type(() => Number)
+  productorId?: number;
+
+  @IsInt() @Min(1) @IsOptional() @Type(() => Number)
+  parcelaId?: number;
+
   @IsEnum(LoteEstado)
   @IsOptional()
   estado?: LoteEstado;

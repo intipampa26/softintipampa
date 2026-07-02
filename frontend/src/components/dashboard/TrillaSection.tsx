@@ -1,13 +1,15 @@
+import { useState } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, Cell, ResponsiveContainer,
 } from 'recharts';
-import type { TrillaResumen, FiltroAño } from '@/types/dashboard.types';
+import type { TrillaResumen } from '@/types/dashboard.types';
 
-const CP = '#445D46';
-const CL = '#8BA989';
+const CP = '#6B8472';
+const CL = '#A8B8A8';
 const BD = '#E8EDE8';
 const TX = '#2C2C2C';
+const C_BAJO = '#B08878';
 
 const CARD_SHADOW = '0 1px 3px rgba(68,93,70,0.06), 0 4px 12px rgba(68,93,70,0.04)';
 
@@ -35,27 +37,50 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 interface Props {
   data: TrillaResumen;
-  año: FiltroAño;
   almacen: string;
 }
 
-export function TrillaSection({ data, año, almacen }: Props) {
-  const lotes = (almacen === 'todos'
+type FiltroTipo = 'todos' | 'CAFE' | 'CACAO';
+
+export function TrillaSection({ data, almacen }: Props) {
+  const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>('todos');
+  const [page, setPage] = useState(0);
+
+  const lotesAll = (almacen === 'todos'
     ? data.detallePorLote
     : data.detallePorLote.filter(r => r.almacen === almacen)
-  ).filter(r => r.rendimientoTotal > 0).slice(0, 25);
+  )
+    .filter(r => r.rendimientoTotal > 0)
+    .filter(r => filtroTipo === 'todos' || (r.tipo ?? '').toUpperCase().includes(filtroTipo));
 
-  const chartData = lotes.map(r => ({
-    nombre: r.id_lote,
-    rend2024: r.rendimiento2024 > 0 ? r.rendimiento2024 : undefined,
-    rend2025: r.rendimiento2025 > 0 ? r.rendimiento2025 : undefined,
+  const totalPages = Math.ceil(lotesAll.length / 5);
+  const safePage = Math.min(page, Math.max(0, totalPages - 1));
+  const lotesPaged = lotesAll.slice(safePage * 5, (safePage + 1) * 5);
+
+  const chartData = lotesAll.slice(0, 25).map(r => ({
+    nombre: r.productorNombre?.trim()
+      ? `${r.productorNombre.trim()}${r.variedad && r.variedad !== 'Sin variedad' ? ' · ' + r.variedad : ''}`
+      : r.nombre || r.id_lote,
     rendTotal: r.rendimientoTotal,
   }));
 
-  const showBoth = año === 'ambos';
-
   return (
     <div className="flex flex-col gap-5">
+      <div className="flex items-center gap-2">
+        {(['todos', 'CAFE', 'CACAO'] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setFiltroTipo(t)}
+            className="px-3 py-1.5 rounded-full text-[0.65rem] font-bold transition-all"
+            style={{
+              background: filtroTipo === t ? CP : '#EFF2EF',
+              color: filtroTipo === t ? '#fff' : '#7A9A7C',
+            }}
+          >
+            {t === 'todos' ? 'Todos' : t === 'CAFE' ? 'Café' : 'Cacao'}
+          </button>
+        ))}
+      </div>
       <div className="rounded-2xl p-5" style={{ background: '#fff', boxShadow: CARD_SHADOW }}>
         <div className="flex items-start justify-between gap-3 mb-4">
           <p className="text-[0.6rem] font-bold uppercase tracking-[0.14em]" style={{ color: '#7A9A7C' }}>
@@ -76,29 +101,16 @@ export function TrillaSection({ data, año, almacen }: Props) {
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine
               y={data.rendimientoPromedio}
-              stroke="#d97706"
+              stroke="#9C8468"
               strokeDasharray="5 3"
               strokeWidth={1.5}
-              label={{ value: `${fmt(data.rendimientoPromedio)}%`, position: 'insideTopRight', fontSize: 10, fill: '#d97706', dy: -8 }}
+              label={{ value: `${fmt(data.rendimientoPromedio)}%`, position: 'insideTopRight', fontSize: 10, fill: '#9C8468', dy: -8 }}
             />
-            {showBoth ? (
-              <>
-                <Legend iconSize={8} wrapperStyle={{ fontSize: 11, color: '#7A9A7C' }} />
-                <Bar dataKey="rend2024" name="2024" fill={CL} radius={[4,4,0,0]} />
-                <Bar dataKey="rend2025" name="2025" radius={[4,4,0,0]}>
-                  {chartData.map((entry, i) => (
-                    <Cell key={i} fill={(entry.rend2025 ?? 0) >= 80 ? CP : '#ef4444'} />
-                  ))}
-                </Bar>
-              </>
-            ) : (
-              <Bar dataKey={año === '2024' ? 'rend2024' : 'rend2025'} name={año} radius={[4,4,0,0]}>
-                {chartData.map((entry, i) => {
-                  const v = año === '2024' ? entry.rend2024 : entry.rend2025;
-                  return <Cell key={i} fill={(v ?? 0) >= 80 ? CP : '#ef4444'} />;
-                })}
-              </Bar>
-            )}
+            <Bar dataKey="rendTotal" name="Rendimiento" radius={[4,4,0,0]}>
+              {chartData.map((entry, i) => (
+                <Cell key={i} fill={entry.rendTotal >= 80 ? CP : C_BAJO} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
         <div className="flex items-center gap-5 mt-3 text-[0.65rem]" style={{ color: '#7A9A7C' }}>
@@ -107,11 +119,11 @@ export function TrillaSection({ data, año, almacen }: Props) {
             ≥ 80%
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm inline-block" style={{ background: '#ef4444' }} />
+            <span className="w-3 h-3 rounded-sm inline-block" style={{ background: C_BAJO }} />
             &lt; 80%
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-5 border-t-2 border-dashed inline-block" style={{ borderColor: '#d97706' }} />
+            <span className="w-5 border-t-2 border-dashed inline-block" style={{ borderColor: '#9C8468' }} />
             Promedio
           </span>
         </div>
@@ -122,10 +134,10 @@ export function TrillaSection({ data, año, almacen }: Props) {
           <table className="w-full text-xs">
             <thead>
               <tr style={{ background: '#EFF2EF' }}>
-                {['Lote', 'Almacén', 'Kg Oro Verde', 'Kg Pergamino', 'Rend. 2024', 'Rend. 2025', 'Rend. Total'].map(h => (
+                {['Productor / Variedad', 'Tipo', 'Zona', 'Rend. Total'].map(h => (
                   <th
                     key={h}
-                    className="px-4 py-3 text-left font-bold whitespace-nowrap"
+                    className="px-4 py-3 text-center font-bold whitespace-nowrap"
                     style={{ color: '#7A9A7C', letterSpacing: '0.05em', fontSize: '0.6rem', textTransform: 'uppercase' }}
                   >
                     {h}
@@ -134,40 +146,63 @@ export function TrillaSection({ data, año, almacen }: Props) {
               </tr>
             </thead>
             <tbody>
-              {lotes.map((r, i) => (
+              {lotesPaged.map((r, i) => (
                 <tr
                   key={r.id_lote + i}
                   className="transition-colors hover:bg-green-50/50"
                   style={{ borderTop: `1px solid ${BD}` }}
                 >
-                  <td className="px-4 py-2.5 font-semibold" style={{ color: TX }}>{r.nombre}</td>
-                  <td className="px-4 py-2.5" style={{ color: '#7A9A7C' }}>{r.almacen}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: TX }}>{fmtKg(r.kgOroVerde)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: TX }}>{fmtKg(r.kgPergamino)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-semibold"
-                    style={{ color: r.rendimiento2024 > 0 ? (r.rendimiento2024 >= 80 ? CP : '#ef4444') : '#ccc' }}>
-                    {r.rendimiento2024 > 0 ? fmt(r.rendimiento2024) + '%' : '—'}
+                  <td className="px-4 py-2.5 text-left">
+                    <span className="font-semibold block" style={{ color: TX }}>
+                      {r.productorNombre?.trim() || r.nombre || r.id_lote}
+                    </span>
+                    {r.variedad && r.variedad !== 'Sin variedad' && (
+                      <span className="text-[0.6rem]" style={{ color: '#7A9A7C' }}>{r.variedad}</span>
+                    )}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-semibold"
-                    style={{ color: r.rendimiento2025 > 0 ? (r.rendimiento2025 >= 80 ? CP : '#ef4444') : '#ccc' }}>
-                    {r.rendimiento2025 > 0 ? fmt(r.rendimiento2025) + '%' : '—'}
+                  <td className="px-4 py-2.5 text-center whitespace-nowrap" style={{ color: '#7A9A7C' }}>
+                    {r.tipo === 'CAFE' ? 'Café' : r.tipo === 'CACAO' ? 'Cacao' : r.tipo}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-black tabular-nums"
-                    style={{ color: r.rendimientoTotal >= 80 ? CP : '#ef4444' }}>
+                  <td className="px-4 py-2.5 text-center whitespace-nowrap" style={{ color: '#7A9A7C' }}>{r.almacen}</td>
+                  <td className="px-4 py-2.5 text-center font-black tabular-nums"
+                    style={{ color: r.rendimientoTotal >= 80 ? CP : C_BAJO }}>
                     {fmt(r.rendimientoTotal)}%
                   </td>
                 </tr>
               ))}
               <tr style={{ background: '#EFF2EF', borderTop: `2px solid ${BD}` }}>
-                <td className="px-4 py-2.5 font-bold" colSpan={6} style={{ color: TX }}>Promedio general</td>
-                <td className="px-4 py-2.5 text-right font-black tabular-nums"
-                  style={{ color: data.rendimientoPromedio >= 80 ? CP : '#ef4444' }}>
+                <td className="px-4 py-2.5 text-center font-bold" colSpan={3} style={{ color: TX }}>Promedio general</td>
+                <td className="px-4 py-2.5 text-center font-black tabular-nums"
+                  style={{ color: data.rendimientoPromedio >= 80 ? CP : C_BAJO }}>
                   {fmt(data.rendimientoPromedio)}%
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: `1px solid ${BD}` }}>
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+              className="px-3 py-1.5 rounded-lg text-[0.65rem] font-semibold disabled:opacity-40 transition-colors"
+              style={{ backgroundColor: '#F0F4F0', color: '#7A9A7C' }}
+            >
+              ← Anterior
+            </button>
+            <span className="text-[0.65rem]" style={{ color: '#96A897' }}>
+              {safePage + 1} / {totalPages} · {lotesAll.length} lotes
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={safePage >= totalPages - 1}
+              className="px-3 py-1.5 rounded-lg text-[0.65rem] font-semibold disabled:opacity-40 transition-colors"
+              style={{ backgroundColor: '#F0F4F0', color: '#7A9A7C' }}
+            >
+              Siguiente →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ToastProvider } from '@/contexts/ToastContext';
 import { FlowProvider } from '@/contexts/FlowContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
@@ -32,6 +33,7 @@ import { DashboardIndicadores } from '@/pages/DashboardIndicadores';
 
 export default function App() {
   return (
+    <ToastProvider>
     <AuthProvider>
       <BrowserRouter>
         <FlowProvider>
@@ -78,5 +80,6 @@ export default function App() {
         </FlowProvider>
       </BrowserRouter>
     </AuthProvider>
+    </ToastProvider>
   );
 }

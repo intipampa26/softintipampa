@@ -10,6 +10,7 @@ import { parcelasService, Parcela } from '@/services/parcelas.service';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { TablePagination } from '@/components/TablePagination';
 import LoadingLogo from '@/components/LoadingLogo';
+import { useToast } from '@/contexts/ToastContext';
 
 const PLANTAS = ['CB Jaen','CB Lima','Expocafé','Kuska','Mego','Selva Norte','Aicasa','Norandino','Negrisa'];
 
@@ -100,7 +101,7 @@ function LoteFormModal({ tiposProducto, campanas, onClose, onSave, initial }: {
     observaciones:    initial?.observaciones     ?? undefined,
   });
   const [saving, setSaving] = useState(false);
-  const [error,  setError]  = useState('');
+  const toast = useToast();
   const [plantaOtro, setPlantaOtro] = useState(() => {
     const p = initial?.planta;
     return !!p && !PLANTAS.includes(p);
@@ -123,13 +124,13 @@ function LoteFormModal({ tiposProducto, campanas, onClose, onSave, initial }: {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.tipoProductoId || !form.productorId || !form.cantidadKg) {
-      setError('Tipo de producto, productor y cantidad son requeridos');
+    if (!form.tipoProductoId || !form.productorId || !form.cantidadKg || !form.planta) {
+      toast.error('Tipo de producto, productor, cantidad y planta (almacén) son requeridos');
       return;
     }
-    setSaving(true); setError('');
+    setSaving(true);
     try { await onSave(form); onClose(); }
-    catch (err) { setError((err as Error).message || 'Error al guardar'); }
+    catch (err) { toast.error((err as Error).message || 'Error al guardar'); }
     finally { setSaving(false); }
   }
 
@@ -142,7 +143,6 @@ function LoteFormModal({ tiposProducto, campanas, onClose, onSave, initial }: {
         </div>
         {saving && <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 rounded-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.93)', backdropFilter: 'blur(2px)' }}><LoadingLogo compact /></div>}
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-3">
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -219,7 +219,7 @@ function LoteFormModal({ tiposProducto, campanas, onClose, onSave, initial }: {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Planta</label>
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Planta <span className="text-red-500">*</span></label>
               <select
                 value={plantaOtro ? 'Otro' : (form.planta ?? '')}
                 onChange={e => {

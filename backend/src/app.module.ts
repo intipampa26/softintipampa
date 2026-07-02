@@ -27,6 +27,8 @@ import { ReportesModule } from './reportes/reportes.module';
 import { MermasModule }        from './mermas/mermas.module';
 import { Merma }               from './mermas/merma.entity';
 import { OrdenesVentaModule }  from './ordenes-venta/ordenes-venta.module';
+import { SkusModule }          from './skus/skus.module';
+import { Sku }                 from './skus/sku.entity';
 
 import { User } from './users/user.entity';
 import { Campana } from './campanas/campana.entity';
@@ -88,6 +90,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
           Muestra, EvaluacionFisica, EvaluacionSensorial,
           Merma, OrdenVenta, OrdenPaso, OrdenPreventa, OrdenCotizacion,
           OrdenAlistado, OrdenExportacion, OrdenPostVenta,
+          Sku,
         ],
         synchronize: true,
         logging: config.get<string>('NODE_ENV') === 'development',
@@ -109,6 +112,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     ReportesModule,
     MermasModule,
     OrdenesVentaModule,
+    SkusModule,
   ],
 
   controllers: [AppController],

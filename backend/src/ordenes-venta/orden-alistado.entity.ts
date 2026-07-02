@@ -87,6 +87,15 @@ export class OrdenAlistado {
   @Column({ default: false })
   costViaticos: boolean;
 
+  @Column({ length: 500, nullable: true })
+  contratoFileName: string | null;
+
+  @Column({ length: 500, nullable: true })
+  contratoFilePath: string | null;
+
+  @Column({ type: 'simple-json', nullable: true })
+  lotesAsignados: { loteFinalId: number; codigo: string; cantidadKg: number | null; nroSacos: number | null; fechaProceso: string | null }[] | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

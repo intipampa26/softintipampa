@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, Send, FileText, Calendar, ChevronDown, Search, Check } from 'lucide-react';
+import { X, Send, FileText, Calendar, ChevronDown, Search } from 'lucide-react';
 import LoadingLogo from './LoadingLogo';
+import { ModalLoadingOverlay } from '@/components/ui/ModalLoadingOverlay';
+import { useToast } from '@/contexts/ToastContext';
 import { ordenesVentaService } from '../services/ordenes-venta.service';
+import { clientesService, Cliente } from '@/services/clientes.service';
+import { campanasService } from '@/services/campanas.service';
+import { muestrasService } from '@/services/muestras.service';
 
 const CP = '#445D46';
 const BD = '#D9DDD8';
@@ -22,7 +27,7 @@ const fieldLabel = (label: string) => (
 type Tab = 'muestras' | 'cotizacion';
 
 interface Props {
-  orden: { dbId: number; id: string; cliente: string; lote: string; tipoProducto: string };
+  orden: { dbId: number; id: string; cliente: string; lote: string; tipoProducto: string; campana: string };
   initialTab?: Tab;
   onClose: () => void;
 }
@@ -48,7 +53,7 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [loading,   setLoading]   = useState(true);
   const [saving,    setSaving]    = useState(false);
-  const [confirm,   setConfirm]   = useState<'success' | 'error' | null>(null);
+  const toast = useToast();
 
   const [fechaEnvio,     setFechaEnvio]     = useState('');
   const [fechaRecepcion, setFechaRecepcion] = useState('');
@@ -59,6 +64,7 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
   const [fitosanitario,  setFitosanitario]  = useState<'si' | 'no' | ''>('');
   const [busqueda,       setBusqueda]       = useState('');
   const [muestras,       setMuestras]       = useState<MuestraRow[]>([]);
+  const [clientes,       setClientes]       = useState<Cliente[]>([]);
 
   const [nroCotizacion, setNroCotizacion] = useState('');
   const [fechaCotiz,    setFechaCotiz]    = useState('');
@@ -70,13 +76,25 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
   const [condPago,      setCondPago]      = useState('');
   const [validez,       setValidez]       = useState('');
   const [observaciones, setObservaciones] = useState('');
+  const [mercado,       setMercado]       = useState<'NACIONAL' | 'INTERNACIONAL'>('NACIONAL');
+
+  useEffect(() => {
+    clientesService.getPage(1, 200).then(r => setClientes(r.data)).catch(() => {});
+  }, []);
+
+  function handleClienteChange(nombre: string) {
+    setClienteNombre(nombre);
+    const c = clientes.find(c => c.nombre === nombre);
+    setRucDni(c?.nroDocumento ?? '');
+  }
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
       ordenesVentaService.getPreventa(orden.dbId),
       ordenesVentaService.getCotizacion(orden.dbId),
-    ]).then(([pv, cot]) => {
+      campanasService.getPage(1, 200),
+    ]).then(async ([pv, cot, campanasData]) => {
       if (pv.preventa) {
         const p = pv.preventa;
         if (p.fechaEnvio)     setFechaEnvio(p.fechaEnvio);
@@ -86,33 +104,6 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
         if (p.courier)        setCourier(p.courier);
         if (p.costoCourier != null) setCostoCourier(String(p.costoCourier));
         if (p.fitosanitario)  setFitosanitario(p.fitosanitario as 'si' | 'no');
-        const detalles: { muestraId: number; cantidad: number | null; costos: number | null }[] = p.muestrasDetalle ?? [];
-        setMuestras(pv.muestras.map((m: any) => {
-          const det = detalles.find(d => d.muestraId === m.id);
-          return {
-            id:          m.id,
-            codigo:      m.codigo ?? '',
-            lote:        m.loteFinal?.codigo ?? m.codigo ?? '',
-            campana:     m.campana?.nombre ?? '',
-            productor:   m.productor?.nombre ?? '',
-            tipoMuestra: m.tipoMuestra ?? '',
-            fecha:       m.fechaRegistro ?? '',
-            cantidad:    det?.cantidad != null ? String(det.cantidad) : '',
-            costos:      det?.costos   != null ? String(det.costos)   : '',
-          };
-        }));
-      } else {
-        setMuestras(pv.muestras.map((m: any) => ({
-          id:          m.id,
-          codigo:      m.codigo ?? '',
-          lote:        m.loteFinal?.codigo ?? m.codigo ?? '',
-          campana:     m.campana?.nombre ?? '',
-          productor:   m.productor?.nombre ?? '',
-          tipoMuestra: m.tipoMuestra ?? '',
-          fecha:       m.fechaRegistro ?? '',
-          cantidad:    '',
-          costos:      '',
-        })));
       }
       if (cot) {
         if (cot.nroCotizacion)   setNroCotizacion(cot.nroCotizacion);
@@ -126,8 +117,30 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
         if (cot.validezDias != null) setValidez(String(cot.validezDias));
         if (cot.observaciones)   setObservaciones(cot.observaciones);
       }
+      const campanaObj = campanasData.data.find(c => c.nombre === orden.campana);
+      if (campanaObj) {
+        const muestrasData = await muestrasService.getPage({ campanaId: campanaObj.id, limit: 500 });
+        const detalles: { muestraId: number; cantidad: number | null; costos: number | null }[] =
+          pv.preventa?.muestrasDetalle ?? [];
+        setMuestras(muestrasData.data.map((m: any) => {
+          const det = detalles.find(d => d.muestraId === m.id);
+          return {
+            id:          m.id,
+            codigo:      m.codigo ?? '',
+            lote:        m.loteFinal?.codigo ?? m.lote?.codigo ?? '',
+            campana:     m.campana?.nombre ?? '',
+            productor:   m.productor
+              ? `${m.productor.nombre}${m.productor.apellido ? ' ' + m.productor.apellido : ''}`.trim()
+              : '',
+            tipoMuestra: m.tipoMuestra ?? '',
+            fecha:       m.fecha ?? '',
+            cantidad:    det?.cantidad != null ? String(det.cantidad) : '',
+            costos:      det?.costos   != null ? String(det.costos)   : '',
+          };
+        }));
+      }
     }).finally(() => setLoading(false));
-  }, [orden.dbId]);
+  }, [orden.dbId, orden.campana]);
 
   const updateMuestra = (id: number, field: 'cantidad' | 'costos', value: string) =>
     setMuestras(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
@@ -171,11 +184,12 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
           condicionesPago: condPago      || undefined,
           validezDias:    validez        ? Number(validez)   : undefined,
           observaciones:  observaciones  || undefined,
+          mercado:        mercado,
         });
       }
-      setConfirm('success');
+      toast.success(activeTab === 'muestras' ? 'Envío guardado correctamente' : 'Cotización actualizada');
     } catch {
-      setConfirm('error');
+      toast.error('Error al guardar');
     } finally {
       setSaving(false);
     }
@@ -191,71 +205,7 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
         className="relative w-full sm:max-w-5xl rounded-t-3xl sm:rounded-3xl flex flex-col overflow-hidden"
         style={{ background: 'rgba(255,255,255,0.96)', backdropFilter: 'blur(28px) saturate(1.4)', WebkitBackdropFilter: 'blur(28px) saturate(1.4)', border: '1px solid rgba(255,255,255,0.6)', boxShadow: '0 24px 60px rgba(0,0,0,0.22)', maxHeight: '92vh' }}
       >
-        {saving && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-t-3xl sm:rounded-3xl" style={{ backgroundColor: 'rgba(255,255,255,0.93)', backdropFilter: 'blur(2px)' }}>
-            <LoadingLogo compact />
-            <p className="text-sm font-semibold text-gray-600 mt-3">Guardando…</p>
-          </div>
-        )}
-
-        {confirm && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center rounded-t-3xl sm:rounded-3xl" style={{ backgroundColor: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
-            <div className="rounded-2xl shadow-2xl overflow-hidden w-72">
-              {confirm === 'success' ? (
-                <>
-                  <div className="flex flex-col items-center gap-3 px-8 py-7" style={{ backgroundColor: '#1A2B23' }}>
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
-                      <Check size={28} className="text-green-300" />
-                    </div>
-                    <p className="font-black text-white text-base text-center leading-tight">Guardado correctamente</p>
-                    <p className="text-xs text-white/50 text-center">
-                      {activeTab === 'muestras' ? 'Envío registrado en kardex' : 'Cotización actualizada'}
-                    </p>
-                  </div>
-                  <div className="bg-white px-6 py-4 flex gap-2">
-                    <button
-                      onClick={() => setConfirm(null)}
-                      className="flex-1 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                    >
-                      Continuar editando
-                    </button>
-                    <button
-                      onClick={onClose}
-                      className="flex-1 py-2 rounded-xl text-sm font-semibold text-white"
-                      style={{ backgroundColor: '#1A2B23' }}
-                    >
-                      Cerrar
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex flex-col items-center gap-3 px-8 py-7 bg-red-600">
-                    <div className="w-14 h-14 rounded-full flex items-center justify-center bg-red-500">
-                      <X size={28} className="text-white" />
-                    </div>
-                    <p className="font-black text-white text-base text-center">Error al guardar</p>
-                    <p className="text-xs text-white/60 text-center">Revisa tu conexión e intenta de nuevo</p>
-                  </div>
-                  <div className="bg-white px-6 py-4 flex gap-2">
-                    <button
-                      onClick={() => setConfirm(null)}
-                      className="flex-1 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-                    >
-                      Cerrar
-                    </button>
-                    <button
-                      onClick={() => { setConfirm(null); handleGuardar(); }}
-                      className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700"
-                    >
-                      Reintentar
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+        <ModalLoadingOverlay show={saving} message="Guardando…" />
 
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
           <div className="flex items-center gap-3 min-w-0">
@@ -325,7 +275,13 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
                 </div>
                 <div>
                   {fieldLabel('Razón social / Cliente')}
-                  <input type="text" value={clienteNombre} onChange={e => setClienteNombre(e.target.value)} className={INP} style={inpStyle} placeholder="Nombre del cliente…" />
+                  <div className="relative">
+                    <select value={clienteNombre} onChange={e => handleClienteChange(e.target.value)} className={`${INP} pr-9 appearance-none`} style={inpStyle}>
+                      <option value="">Seleccionar cliente…</option>
+                      {clientes.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
                 </div>
                 <div>
                   {fieldLabel('Nombre del courier')}
@@ -361,7 +317,7 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
                   <table className="w-full text-xs border-collapse min-w-[700px]">
                     <thead>
                       <tr style={{ backgroundColor: BG }}>
-                        {['CÓDIGO','LOTE','CAMPAÑA','PRODUCTOR','CANTIDAD','TIPO','FECHA','COSTO'].map(h => (
+                        {['CÓDIGO','LOTE','CAMPAÑA','PRODUCTOR','CANTIDAD (kg)','FECHA','COSTO'].map(h => (
                           <th key={h} className="text-[0.6rem] font-black uppercase tracking-wide text-center py-2.5 px-3" style={{ color: CP, borderBottom: `2px solid ${BD}` }}>{h}</th>
                         ))}
                       </tr>
@@ -376,7 +332,6 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
                           <td className="py-2 px-3 text-center">
                             <input type="number" value={m.cantidad} onChange={e => updateMuestra(m.id,'cantidad',e.target.value)} className="w-20 border rounded-full px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-green-500" style={{ borderColor: BD }} placeholder="0 kg" />
                           </td>
-                          <td className="py-2 px-3 text-center text-gray-500">{m.tipoMuestra}</td>
                           <td className="py-2 px-3 text-center text-gray-400">{m.fecha}</td>
                           <td className="py-2 px-3 text-center">
                             <input type="number" value={m.costos} onChange={e => updateMuestra(m.id,'costos',e.target.value)} className="w-20 border rounded-full px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-green-500" style={{ borderColor: BD }} placeholder="$ 0" />
@@ -384,7 +339,7 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
                         </tr>
                       ))}
                       {filtradas.length === 0 && (
-                        <tr><td colSpan={8} className="py-6 text-center text-xs text-gray-400">Sin resultados para "{busqueda}"</td></tr>
+                        <tr><td colSpan={7} className="py-6 text-center text-xs text-gray-400">Sin resultados para "{busqueda}"</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -464,6 +419,26 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
                   <p className="font-black text-base" style={{ color: CP }}>{monedaSymbol} {total.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
                 </div>
               )}
+
+              <div>
+                {fieldLabel('Mercado')}
+                <div className="flex gap-2 mt-1">
+                  {(['NACIONAL', 'INTERNACIONAL'] as const).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMercado(m)}
+                      className="flex-1 py-2 rounded-xl text-xs font-bold transition-all"
+                      style={{
+                        background: mercado === m ? CP : '#EFF2EF',
+                        color: mercado === m ? '#fff' : '#7A9A7C',
+                      }}
+                    >
+                      {m === 'NACIONAL' ? 'Nacional' : 'Internacional'}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div>
                 {fieldLabel('Observaciones')}

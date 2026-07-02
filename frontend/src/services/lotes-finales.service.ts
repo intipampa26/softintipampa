@@ -10,6 +10,8 @@ export interface LoteFinal {
   tipoProducto?: { id: number; tipo: string; subtipoEntrada: string; subtipoSalida: string };
   campanaId: number | null;
   campana?: { id: number; nombre: string };
+  skuId?: number | null;
+  sku?: { id: number; nombre: string; codigoHS?: string | null; requiereFito?: boolean; codigoFDA?: string | null; nombreFDA?: string | null } | null;
   cantidadKg: number;
   tipoOrigen: LoteFinalTipoOrigen;
   estado: LoteFinalEstado;
@@ -81,6 +83,7 @@ export interface TrillarDto {
   mermaReutilizableKg: number;
   mermaDesechableKg: number;
   sobranteExportableKg: number;
+  skuId?: number;
   observaciones?: string;
 }
 

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, ArrowLeft, ClipboardList, FileDown, RotateCcw, Save } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import LoadingLogo from '@/components/LoadingLogo';
+import { useToast } from '@/contexts/ToastContext';
 import { muestrasService, Muestra } from '@/services/muestras.service';
 import {
   evaluacionCafeVerdeSchema,
@@ -151,6 +152,7 @@ function muestraToDefaults(m: Muestra): Partial<EvaluacionCafeVerdeForm> {
 export function EvaluacionCafeVerdePage() {
   const [searchParams] = useSearchParams();
   const navigate       = useNavigate();
+  const toast = useToast();
   const muestraId      = searchParams.get('muestraId');
 
   const [muestra,        setMuestra]        = useState<Muestra | null>(null);
@@ -527,7 +529,7 @@ export function EvaluacionCafeVerdePage() {
 
           <button
             type="button"
-            onClick={() => alert('Exportar PDF — próximamente')}
+            onClick={() => toast.info('Exportar PDF — próximamente')}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl border text-sm font-semibold transition-colors"
             style={{ borderColor: '#6EE7B7', backgroundColor: '#F0FDF4', color: COLOR_SECONDARY }}
           >

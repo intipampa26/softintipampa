@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import LoadingLogo from '@/components/LoadingLogo';
+import { useToast } from '@/contexts/ToastContext';
 import { lotesFinalesService, LoteFinal } from '@/services/lotes-finales.service';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -277,7 +278,7 @@ function OrdenModal({ initial, onClose, onSave }: { initial?: OrdenOp | null; on
   });
   const [lotes,        setLotes]        = useState<LoteFinal[]>([]);
   const [saving,       setSaving]       = useState(false);
-  const [error,        setError]        = useState('');
+  const toast = useToast();
   const [loteCantidad, setLoteCantidad] = useState<number | null>(null);
   const [venderTodo,   setVenderTodo]   = useState(false);
   const autoTp = useRef(false);
@@ -289,9 +290,9 @@ function OrdenModal({ initial, onClose, onSave }: { initial?: OrdenOp | null; on
   const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(f => ({ ...f, [k]: v }));
 
   async function handleSave() {
-    setSaving(true); setError('');
+    setSaving(true);
     try { await onSave(form); onClose(); }
-    catch (e: any) { setError(e?.response?.data?.message ?? 'Error al guardar'); }
+    catch (e: any) { toast.error(e?.response?.data?.message ?? 'Error al guardar'); }
     finally { setSaving(false); }
   }
 
@@ -312,7 +313,6 @@ function OrdenModal({ initial, onClose, onSave }: { initial?: OrdenOp | null; on
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"><X size={18} /></button>
         </div>
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Cliente</label>
