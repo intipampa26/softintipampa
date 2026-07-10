@@ -20,13 +20,16 @@ const COLORES_PIE = [
   '#90A08A', '#9A8878', '#8098A0',
 ];
 const COLORES_ALMACEN: Record<string, string> = {
-  'Kuska':       '#6B8472',
-  'Mego':        '#9C8468',
-  'Selva Norte': '#7A8C9C',
-  'CB Jaen':     '#8A9E8A',
-  'CB Lima':     '#A09078',
-  'Expocafe':    '#9088A0',
-  'Norandino':   '#8A9CB0',
+  'CB JAEN':     '#8A9E8A',
+  'CB LIMA':     '#A09078',
+  'EXPOCAFÉ':    '#9088A0',
+  'KUSKA':       '#6B8472',
+  'MEGO':        '#9C8468',
+  'SELVA NORTE': '#7A8C9C',
+  'AICASA':      '#A08878',
+  'NORANDINO':   '#8A9CB0',
+  'NEGRISA':     '#8A8A9C',
+  'OTRO':        '#B0A898',
   'Sin almacén': '#C0C0BC',
 };
 

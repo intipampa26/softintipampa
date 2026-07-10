@@ -35,12 +35,14 @@ interface FormState {
 }
 
 interface Props {
-  muestra:         Muestra;
-  formId:          string;
-  onSaved:         () => void;
-  onSaveError?:    () => void;
-  onSavingChange:  (v: boolean) => void;
-  onLoadingChange: (v: boolean) => void;
+  muestra:             Muestra;
+  formId:              string;
+  onSaved:             () => void;
+  onSaveError?:        () => void;
+  onSavingChange:      (v: boolean) => void;
+  onLoadingChange:     (v: boolean) => void;
+  initialState?:       FormState;
+  onFormStateChange?:  (state: FormState) => void;
 }
 
 const ROAST = ['#D4B07A', '#B8783A', '#8C5120', '#5E2F0A', '#2D1200'];
@@ -168,10 +170,11 @@ function IntensidadToggle({
   );
 }
 
-export function EvaluacionSensorialCafeContent({ muestra, formId, onSaved, onSaveError, onSavingChange, onLoadingChange }: Props) {
-  const [form, setForm] = useState<FormState>(() => defForm(new Date().toISOString().slice(0, 10)));
+export function EvaluacionSensorialCafeContent({ muestra, formId, onSaved, onSaveError, onSavingChange, onLoadingChange, initialState, onFormStateChange }: Props) {
+  const [form, setForm] = useState<FormState>(() => initialState ?? defForm(new Date().toISOString().slice(0, 10)));
   const [error, setError] = useState('');
   const [variedad, setVariedad] = useState(muestra.variedad ?? '');
+  const [apiLoaded, setApiLoaded] = useState(!!initialState);
 
   const s = form.sample;
 
@@ -183,8 +186,12 @@ export function EvaluacionSensorialCafeContent({ muestra, formId, onSaved, onSav
     setForm(p => ({ ...p, sample: { ...p.sample, ...partial } }));
   }
 
-  
   useEffect(() => {
+    if (initialState) {
+      // Data injected externally — skip API call and signal ready immediately
+      onLoadingChange(false);
+      return;
+    }
     onLoadingChange(true);
     muestrasService.getDetalle(muestra.id).then(d => {
       if (d.muestra?.variedad) setVariedad(d.muestra.variedad);
@@ -195,13 +202,21 @@ export function EvaluacionSensorialCafeContent({ muestra, formId, onSaved, onSav
         const draft = localStorage.getItem(LS(muestra.id));
         if (draft) { try { setForm(JSON.parse(draft)); } catch {} }
       }
-    }).finally(() => onLoadingChange(false));
-  }, [muestra.id]); 
+    }).finally(() => setApiLoaded(true));
+  }, [muestra.id]);
 
-  
+  // Fire onLoadingChange(false) AFTER React re-renders with the new form data
   useEffect(() => {
-    localStorage.setItem(LS(muestra.id), JSON.stringify(form));
-  }, [form, muestra.id]);
+    if (apiLoaded && !initialState) onLoadingChange(false);
+  }, [apiLoaded]);
+
+  // Save to localStorage and notify parent of current state — never for injected instances
+  useEffect(() => {
+    if (apiLoaded && !initialState) {
+      localStorage.setItem(LS(muestra.id), JSON.stringify(form));
+      onFormStateChange?.(form);
+    }
+  }, [form, muestra.id, apiLoaded]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -542,7 +557,7 @@ export function EvaluacionSensorialCafeContent({ muestra, formId, onSaved, onSav
             </span>
           )}
           <span
-            className="mt-0.5 px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide border border-current rounded-sm"
+            className="mt-2 px-2 py-0.5 text-[0.6rem] font-black uppercase tracking-wide border border-current rounded-sm"
             style={{ backgroundColor: cl_.bg, color: cl_.color }}
           >
             {cl_.label}

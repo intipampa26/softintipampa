@@ -133,17 +133,50 @@ export function EvaluacionFisicaContent({ muestra, formId, onSaved, onSaveError,
     onLoadingChange(true);
     muestrasService.getDetalle(muestra.id)
       .then(({ muestra: m, evaluacionFisica: ef }) => {
-        reset({ ...mockEvaluacionCafeVerde, ...muestraToDefaults(m) });
         if (m.variedad) setVariedad(m.variedad);
         if (ef) {
           const c = ((ef as any)?.camposJson ?? {}) as any;
           if (c.cafeHumedadGrano   != null) setHumedadGrano(String(c.cafeHumedadGrano));
           if (c.cafeActividadGrano != null) setActividadGrano(String(c.cafeActividadGrano));
+          const det = (() => { try { return JSON.parse(c.cafeVerdeDetalle ?? '{}'); } catch { return {}; } })();
+          const cat1 = det.cat1 ?? {};
+          const cat2 = det.cat2 ?? {};
+          reset({
+            ...mockEvaluacionCafeVerde,
+            ...muestraToDefaults(m),
+            nombre:    det.nombre    || '',
+            evaluador: det.evaluador || '',
+            fecha:     (ef as any).fecha ?? m.fecha ?? new Date().toISOString().slice(0, 10),
+            observaciones: (ef as any).observaciones ?? '',
+            tostadoMuestraNo: det.tostado?.muestraNo ?? '',
+            tostadoColor:     det.tostado?.color     ?? '',
+            tostadoOlor:      det.tostado?.olor      ?? '',
+            tostadoQuakers:   det.tostado?.quakers   ?? 0,
+            tostadoGrado:     det.tostado?.grado     ?? '',
+            negroCompleto:  { granos: cat1.negroCompleto?.granos  ?? 0 },
+            agrioCompleto:  { granos: cat1.agrioCompleto?.granos  ?? 0 },
+            cerezaSeca:     { granos: cat1.cerezaSeca?.granos     ?? 0 },
+            danoHongos:     { granos: cat1.danoHongos?.granos     ?? 0 },
+            materiaExtrana: { granos: cat1.materiaExtrana?.granos ?? 0 },
+            brocaSevera:    { granos: cat1.brocaSevera?.granos    ?? 0 },
+            negroParcial:   { granos: cat2.negroParcial?.granos   ?? 0 },
+            agrioPartial:   { granos: cat2.agrioPartial?.granos   ?? 0 },
+            pergamino:      { granos: cat2.pergamino?.granos      ?? 0 },
+            flotador:       { granos: cat2.flotador?.granos       ?? 0 },
+            inmaduro:       { granos: cat2.inmaduro?.granos       ?? 0 },
+            averanado:      { granos: cat2.averanado?.granos      ?? 0 },
+            conchas:        { granos: cat2.conchas?.granos        ?? 0 },
+            rotosPartidos:  { granos: cat2.rotosPartidos?.granos  ?? 0 },
+            cascaras:       { granos: cat2.cascaras?.granos       ?? 0 },
+            brocaLeve:      { granos: cat2.brocaLeve?.granos      ?? 0 },
+          });
+        } else {
+          reset({ ...mockEvaluacionCafeVerde, ...muestraToDefaults(m) });
         }
       })
       .catch(() => {})
       .finally(() => onLoadingChange(false));
-  }, [muestra.id]); 
+  }, [muestra.id]);
 
   const w = watch();
 

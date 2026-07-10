@@ -23,7 +23,7 @@ const ESTADO_COLOR: Record<LoteFinalEstado, string> = {
 const ORIGEN_LABEL = { DIRECTO: 'Directo', DIVISION: 'División', MEZCLA: 'Mezcla' };
 
 function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () => void; onConfirm: (dto: TrillarDto) => Promise<void> }) {
-  const PLANTAS = ['CB Jaen', 'CB Lima', 'Expocafé', 'Kuska', 'Mego', 'Selva Norte', 'Aicasa', 'Norandino', 'Negrisa'];
+  const PLANTAS = ['CB JAEN', 'CB LIMA', 'EXPOCAFÉ', 'KUSKA', 'MEGO', 'SELVA NORTE', 'AICASA', 'NORANDINO', 'NEGRISA'];
 
   const [form, setForm] = useState<Partial<TrillarDto>>({
     fecha: new Date().toISOString().slice(0, 10),
@@ -105,16 +105,16 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
             <div>
               <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Planta *</label>
               <select
-                value={plantaOtro ? 'Otro' : (form.planta ?? '')}
+                value={plantaOtro ? 'OTRO' : (form.planta ?? '')}
                 onChange={e => {
-                  if (e.target.value === 'Otro') { setPlantaOtro(true); setForm(f => ({ ...f, planta: undefined })); }
+                  if (e.target.value === 'OTRO') { setPlantaOtro(true); setForm(f => ({ ...f, planta: undefined })); }
                   else { setPlantaOtro(false); setForm(f => ({ ...f, planta: e.target.value || undefined })); }
                 }}
                 className={cls}
               >
                 <option value="">Seleccionar…</option>
                 {PLANTAS.map(p => <option key={p} value={p}>{p}</option>)}
-                <option value="Otro">Otro…</option>
+                <option value="OTRO">OTRO</option>
               </select>
               {plantaOtro && (
                 <input
@@ -126,7 +126,7 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
                 />
               )}
             </div>
-            <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Malla *</label><input value={form.malla ?? ''} onChange={e => setForm(f => ({ ...f, malla: e.target.value || undefined }))} className={cls} /></div>
+            <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Malla *</label><select value={form.malla ?? ''} onChange={e => setForm(f => ({ ...f, malla: e.target.value || undefined }))} className={cls}><option value="">Seleccionar…</option>{['14','15','16','-14'].map(m => <option key={m} value={m}>{m}</option>)}</select></div>
             <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Tipo Selección *</label><input value={form.tipoSeleccion ?? ''} onChange={e => setForm(f => ({ ...f, tipoSeleccion: e.target.value || undefined }))} className={cls} /></div>
           </div>
           <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Encargado *</label><input value={form.encargado ?? ''} onChange={e => setForm(f => ({ ...f, encargado: e.target.value || undefined }))} className={cls} /></div>

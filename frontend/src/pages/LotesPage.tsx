@@ -12,7 +12,7 @@ import { TablePagination } from '@/components/TablePagination';
 import LoadingLogo from '@/components/LoadingLogo';
 import { useToast } from '@/contexts/ToastContext';
 
-const PLANTAS = ['CB Jaen','CB Lima','Expocafé','Kuska','Mego','Selva Norte','Aicasa','Norandino','Negrisa'];
+const PLANTAS = ['CB JAEN','CB LIMA','EXPOCAFÉ','KUSKA','MEGO','SELVA NORTE','AICASA','NORANDINO','NEGRISA'];
 
 const POST_TRILLADO: LoteEstado[] = ['POST_TRILLADO', 'PREPARADO', 'EMBARCADO', 'EXPORTADO'];
 function subtipoCafe(estado: LoteEstado) { return POST_TRILLADO.includes(estado) ? 'Café Pergamino' : 'Café Oro Verde'; }
@@ -221,17 +221,17 @@ function LoteFormModal({ tiposProducto, campanas, onClose, onSave, initial }: {
             <div>
               <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Planta <span className="text-red-500">*</span></label>
               <select
-                value={plantaOtro ? 'Otro' : (form.planta ?? '')}
+                value={plantaOtro ? 'OTRO' : (form.planta ?? '')}
                 onChange={e => {
                   const v = e.target.value;
-                  if (v === 'Otro') { setPlantaOtro(true); setForm(f => ({ ...f, planta: undefined })); }
+                  if (v === 'OTRO') { setPlantaOtro(true); setForm(f => ({ ...f, planta: undefined })); }
                   else { setPlantaOtro(false); setForm(f => ({ ...f, planta: v || undefined })); }
                 }}
                 className={cls}
               >
                 <option value="">Sin planta</option>
                 {PLANTAS.map(p => <option key={p} value={p}>{p}</option>)}
-                <option value="Otro">Otro</option>
+                <option value="OTRO">OTRO</option>
               </select>
               {plantaOtro && (
                 <input
@@ -397,7 +397,7 @@ export function LotesPage() {
               <select value={filterPlanta} onChange={e => { setFilterPlanta(e.target.value); setPage(1); }} className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                 <option value="">Todas</option>
                 {PLANTAS.map(p => <option key={p} value={p}>{p}</option>)}
-                <option value="Otro">Otro</option>
+                <option value="OTRO">OTRO</option>
               </select>
             </div>
           </div>

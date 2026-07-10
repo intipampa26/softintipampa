@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import JSZip from 'jszip';
+import { buildSensorialCafePdfDirect, buildFisicaCafePdfDirect, PdfMuestraInfo } from '@/utils/pdf-evaluaciones';
 
 const VARIEDADES_CAFE  = ['Caturra','Borbón Rojo','Borbon naranja','Gesha','Pacamara','Tabi','Sidra','Papayo','Blend','Pache','Costa Rica 95','Tipica','Catimor','Maragogipe','SL34','Villa Sarchí','Marsellesa','Limani'];
 const VARIEDADES_CACAO = ['Cacao','Macambo','Cupui','Copuazu','Manteca de cacao','Polvo de cacao','Nibs de cacao','Pasta de cacao'];
@@ -40,6 +42,7 @@ const ESTADO_BADGE: Record<string, string> = {
   en_proceso: 'bg-blue-100   text-blue-700   border border-blue-200',
 };
 
+
 interface FormularioModalProps {
   muestra: Muestra;
   onClose: () => void;
@@ -56,16 +59,79 @@ function FormularioModal({ muestra, onClose, onGuardado }: FormularioModalProps)
     || muestra.tipoMuestra === 'cafe'
     || muestra.tipoProducto === 'cafe';
 
-  const [tab,                setTab]               = useState<'sensorial' | 'fisica'>('sensorial');
-  const [loadingDetalle,     setLoadingDetalle]     = useState(true);
-  const [fisicaLoading,      setFisicaLoading]      = useState(false);
+  const [tab,                  setTab]                 = useState<'sensorial' | 'fisica'>('sensorial');
+  const [loadingDetalle,       setLoadingDetalle]       = useState(true);
+  const [fisicaLoading,        setFisicaLoading]        = useState(false);
   const [cafeSensorialLoading, setCafeSensorialLoading] = useState(false);
-  const [saving,             setSaving]             = useState(false);
-  const [saveResult,         setSaveResult]         = useState<null | 'success' | 'error'>(null);
+  const [saving,               setSaving]               = useState(false);
+  const [saveResult,           setSaveResult]           = useState<null | 'success' | 'error'>(null);
+  const [downloadingPdf,       setDownloadingPdf]       = useState(false);
   const toast = useToast();
 
-  const iictDataRef = useRef<IICTEData | null>(null);
-  const [iictData,  setIictData] = useState<Partial<IICTEData>>({});
+  const iictDataRef           = useRef<IICTEData | null>(null);
+  const [iictData, setIictData] = useState<Partial<IICTEData>>({});
+  const sensorialLiveStateRef = useRef<any>(null);
+
+  async function handleDescargarPDF() {
+    setDownloadingPdf(true);
+    try {
+      const pdfInfo: PdfMuestraInfo = {
+        codigo:          muestra.codigo,
+        productorNombre: muestra.productor ? `${muestra.productor.nombre} ${muestra.productor.apellido ?? ''}`.trim() : null,
+        campana:         muestra.campana?.nombre,
+        lote:            muestra.lote?.codigo ?? (muestra as any).loteFinal?.codigo,
+        fecha:           muestra.fecha,
+        variedad:        muestra.variedad,
+        proceso:         muestra.proceso,
+        planta:          muestra.planta,
+        parcela:         muestra.parcela ? `${muestra.parcela.nombre} (${muestra.parcela.codigo})` : null,
+        rendimiento:     muestra.rendimiento,
+        humedad:         muestra.humedad    != null ? String(muestra.humedad)    : null,
+        base:            muestra.base       != null ? String(muestra.base)       : null,
+        cantidadKg:      muestra.cantidadKg != null ? String(muestra.cantidadKg) : null,
+        añoCosecha:      muestra.añoCosecha != null ? String(muestra.añoCosecha) : null,
+        region:          muestra.region,
+        pais:            muestra.pais,
+      };
+
+      const detalle = await muestrasService.getDetalle(muestra.id);
+
+      const fecha  = new Date().toISOString().slice(0, 10);
+      const folder = `${muestra.codigo}-${fecha}`;
+      const zip    = new JSZip();
+      const dir    = zip.folder(folder)!;
+
+      // Física PDF
+      dir.file('evaluacion-fisica.pdf', buildFisicaCafePdfDirect(pdfInfo, detalle.evaluacionFisica));
+
+      // Sensorial PDF
+      if (!esCacao) {
+        // Priority: live state → API saved data → localStorage draft
+        const scaData = sensorialLiveStateRef.current
+          ?? (detalle.evaluacionSensorial as any)?.camposJson?.cafeSca
+          ?? (() => {
+            try {
+              const raw = localStorage.getItem(`intipampa_cafe_cupping_${muestra.id}`);
+              return raw ? JSON.parse(raw) : null;
+            } catch { return null; }
+          })();
+        dir.file('evaluacion-sensorial.pdf', buildSensorialCafePdfDirect(pdfInfo, scaData));
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const a   = document.createElement('a');
+      a.href     = url;
+      a.download = `${folder}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[PDF] Error:', err);
+      toast.error('Error al generar PDFs. Intenta de nuevo.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
 
   useEffect(() => {
     if (!esCacao) { setLoadingDetalle(false); return; }
@@ -256,6 +322,7 @@ function FormularioModal({ muestra, onClose, onGuardado }: FormularioModalProps)
               onSaveError={() => setSaveResult('error')}
               onSavingChange={setSaving}
               onLoadingChange={setCafeSensorialLoading}
+              onFormStateChange={(state) => { sensorialLiveStateRef.current = state; }}
             />
           )}
 
@@ -275,6 +342,31 @@ function FormularioModal({ muestra, onClose, onGuardado }: FormularioModalProps)
           <button type="button" onClick={onClose}
             className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">
             Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleDescargarPDF}
+            disabled={downloadingPdf || saving || loadingDetalle}
+            className="py-2.5 px-4 rounded-xl border text-sm font-semibold disabled:opacity-50 transition-all flex items-center gap-2 shrink-0"
+            style={{ borderColor: '#283F34', color: '#283F34' }}
+            title="Descargar ambas evaluaciones en PDF (ZIP)"
+          >
+            {downloadingPdf ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Generando…
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                PDF
+              </>
+            )}
           </button>
           {tab === 'sensorial' && esCacao && (
             <button type="button" onClick={handleGuardar} disabled={saving || loadingDetalle}
@@ -302,6 +394,7 @@ function FormularioModal({ muestra, onClose, onGuardado }: FormularioModalProps)
           )}
         </div>
       </div>
+
     </div>
   );
 }
@@ -314,7 +407,7 @@ interface MuestraFormModalProps {
   onSave: (dto: CreateMuestraDto, id?: number) => Promise<void>;
 }
 
-const PLANTAS_STD = ['CB Jaen','CB Lima','Expocafé','Kuska','Mego','Selva Norte','Aicasa','Norandino','Negrisa'];
+const PLANTAS_STD = ['CB JAEN','CB LIMA','EXPOCAFÉ','KUSKA','MEGO','SELVA NORTE','AICASA','NORANDINO','NEGRISA'];
 
 function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }: MuestraFormModalProps) {
   const [productores,       setProductores]       = useState<Productor[]>([]);
@@ -856,22 +949,25 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Proceso</label>
-                <input value={form.proceso ?? ''} onChange={(e) => set('proceso')(e.target.value)} className={cls} placeholder="Lavado, Natural…" />
+                <select value={form.proceso ?? ''} onChange={(e) => set('proceso')(e.target.value)} className={cls}>
+                  <option value="">Sin proceso</option>
+                  {['PROCESO','LAVADO','HONEY','NATURAL','ASD','DOBLE FERMENTO','FERMENTACIÓN PROLONGADO','CAJONES FERMENTADORES','EXPERIMENTAL','OTRO'].map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Planta</label>
                 <select
-                  value={plantaOtro ? 'Otro' : (form.planta ?? '')}
+                  value={plantaOtro ? 'OTRO' : (form.planta ?? '')}
                   onChange={(e) => {
                     const v = e.target.value;
-                    if (v === 'Otro') { setPlantaOtro(true); set('planta')(undefined as any); }
+                    if (v === 'OTRO') { setPlantaOtro(true); set('planta')(undefined as any); }
                     else { setPlantaOtro(false); set('planta')(v || undefined as any); }
                   }}
                   className={cls}
                 >
                   <option value="">Sin planta</option>
                   {PLANTAS_STD.map(p => <option key={p} value={p}>{p}</option>)}
-                  <option value="Otro">Otro</option>
+                  <option value="OTRO">OTRO</option>
                 </select>
                 {plantaOtro && (
                   <input
@@ -1189,7 +1285,7 @@ function AdquirirModal({
               <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Planta</label>
               <select value={form.planta} onChange={(e) => setForm(f => ({ ...f, planta: e.target.value }))} className={cls}>
                 <option value="">Sin planta</option>
-                {['CB Jaen','CB Lima','Expocafé','Kuska','Mego','Selva Norte','Aicasa','Norandino','Negrisa'].map(p => <option key={p} value={p}>{p}</option>)}
+                {['CB JAEN','CB LIMA','EXPOCAFÉ','KUSKA','MEGO','SELVA NORTE','AICASA','NORANDINO','NEGRISA'].map(p => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
           </div>
