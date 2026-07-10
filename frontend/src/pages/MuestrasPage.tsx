@@ -1220,7 +1220,7 @@ function AdquirirModal({
       <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg max-h-[92dvh] flex flex-col">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
           <div>
-            <h3 className="font-black text-gray-800 uppercase tracking-wide">Adquirir lote</h3>
+            <h3 className="font-black text-gray-800 uppercase tracking-wide">Acopio</h3>
             <p className="text-xs text-gray-400 mt-0.5">Lote <span className="font-semibold text-gray-600">{loteRef.codigo}</span> — confirma datos de ingreso al almacén</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">
@@ -1393,14 +1393,14 @@ function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir
               Proceso: <span className="text-gray-600 font-semibold">{muestra.proceso}</span>
             </p>
           )}
-          {muestra.lote?.estado === 'PRE_ADQUISICION' && muestra.loteCreado === true && onAdquirir && (
+          {muestra.lote?.estado === 'PRE_ADQUISICION' && onAdquirir && (
             <button
               onClick={onAdquirir}
               className="mt-1 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.65rem] font-bold text-white uppercase tracking-wide hover:opacity-90 active:scale-[0.97] transition-all"
               style={{ backgroundColor: '#283F34' }}
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-              Adquirir lote
+              ACOPIO
             </button>
           )}
           {muestra.parcela && (
@@ -1836,7 +1836,7 @@ export function MuestrasPage() {
                   onEvaluaciones={() => { setSelected(m); setModal('evaluaciones'); }}
                   onEditar={()       => { setSelected(m); setModal('edit'); }}
                   onEliminar={()     => { setSelected(m); setModal('delete'); }}
-                  onAdquirir={m.lote?.estado === 'PRE_ADQUISICION' && m.loteCreado === true ? () => handleAdquirir(m) : undefined}
+                  onAdquirir={m.lote?.estado === 'PRE_ADQUISICION' ? () => handleAdquirir(m) : undefined}
                 />
               ))}
             </div>
