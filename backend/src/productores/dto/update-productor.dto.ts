@@ -68,4 +68,13 @@ export class UpdateProductorDto {
   @IsBoolean() @IsOptional() tieneLuz?: boolean;
   @IsBoolean() @IsOptional() tieneInternet?: boolean;
   @IsBoolean() @IsOptional() tieneBanio?: boolean;
+
+  @IsString() @IsOptional() @MaxLength(100)  empresaTipo?: string | null;
+  @IsString() @IsOptional() @MaxLength(200)  empresaGerenteGeneral?: string | null;
+  @IsInt()    @IsOptional() @Type(() => Number) empresaAnioInicio?: number | null;
+  @IsString() @IsOptional()                  empresaInfoLegal?: string | null;
+  @IsString() @IsOptional() @MaxLength(200)  empresaNombreComercial?: string | null;
+  @IsString() @IsOptional() @MaxLength(200)  empresaAcopiador?: string | null;
+  @IsString() @IsOptional()                  empresaInfoSunat?: string | null;
+  @IsInt()    @IsOptional() @Type(() => Number) empresaCantTrabajadores?: number | null;
 }
