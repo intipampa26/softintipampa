@@ -1208,12 +1208,12 @@ export function ProductoresPage() {
   
   useEffect(() => {
     setPage(1);
-    load(1, limit, dniActivo, nombreActivo, tipoProductorFiltro);
-  }, [campanaId]); 
+    load(1, limit, dniActivo, nombreActivo, tipoProductorFiltro, filtroDepartamento, filtroTipoProducto);
+  }, [campanaId]);
 
   useEffect(() => {
-    load(page, limit, dniActivo, nombreActivo, tipoProductorFiltro);
-  }, [page, limit, dniActivo, nombreActivo, tipoProductorFiltro]); 
+    load(page, limit, dniActivo, nombreActivo, tipoProductorFiltro, filtroDepartamento, filtroTipoProducto);
+  }, [page, limit, dniActivo, nombreActivo, tipoProductorFiltro, filtroDepartamento, filtroTipoProducto]);
 
   useEffect(() => {
     if (!justReconnected) return;

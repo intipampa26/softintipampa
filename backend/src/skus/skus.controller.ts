@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SkusService } from './skus.service';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
@@ -14,7 +14,11 @@ export class SkusController {
   constructor(private readonly service: SkusService) {}
 
   @Get()
-  findAll() { return this.service.findAll(); }
+  findAll(@Query('soloOtros') soloOtros?: string) {
+    if (soloOtros === 'true')  return this.service.findAll(true);
+    if (soloOtros === 'false') return this.service.findAll(false);
+    return this.service.findAll();
+  }
 
   @Post()
   create(@Body() dto: CreateSkuDto) {

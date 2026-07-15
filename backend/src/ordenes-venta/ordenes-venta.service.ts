@@ -306,44 +306,53 @@ export class OrdenesVentaService {
   async upsertExportacion(ordenId: number, dto: UpsertExportacionDto): Promise<OrdenExportacion> {
     await this.findOne(ordenId);
     let row = await this.exportacionRepo.findOne({ where: { ordenVentaId: ordenId } });
+    const esNuevo = !row;
     if (!row) row = this.exportacionRepo.create({ ordenVentaId: ordenId });
     Object.assign(row, dto);
+    if (esNuevo && !row.codExport) {
+      const year = new Date().getFullYear();
+      const last = await this.exportacionRepo
+        .createQueryBuilder('e')
+        .where("e.codExport LIKE :pat", { pat: `EXP-${year}-%` })
+        .orderBy("e.codExport", "DESC")
+        .getOne();
+      const lastNum = last ? parseInt(last.codExport!.split('-')[2] ?? '0', 10) : 0;
+      row.codExport = `EXP-${year}-${String(lastNum + 1).padStart(3, '0')}`;
+    }
     return this.exportacionRepo.save(row);
   }
 
   async uploadExportacionFile(
     ordenId: number,
-    tipo: 'documentos' | 'reportes',
+    tipo: string,
     file: any,
   ): Promise<{ name: string; file: string }[]> {
     await this.findOne(ordenId);
     let row = await this.exportacionRepo.findOne({ where: { ordenVentaId: ordenId } });
     if (!row) row = this.exportacionRepo.create({ ordenVentaId: ordenId });
-    const field = tipo === 'documentos' ? 'documentosAsociados' : 'reportesCalidad';
-    const current: { name: string; file: string }[] = Array.isArray((row as any)[field])
-      ? (row as any)[field]
-      : [];
     const entry = { name: file.originalname as string, file: file.filename as string };
+    const current: { name: string; file: string }[] = Array.isArray(row.filesMap?.[tipo])
+      ? (row.filesMap![tipo] as { name: string; file: string }[])
+      : [];
     const updated = [...current, entry];
-    (row as any)[field] = updated;
+    row.filesMap = { ...(row.filesMap ?? {}), [tipo]: updated };
     await this.exportacionRepo.save(row);
     return updated;
   }
 
   async deleteExportacionFile(
     ordenId: number,
-    tipo: 'documentos' | 'reportes',
+    tipo: string,
     filename: string,
   ): Promise<{ name: string; file: string }[]> {
     await this.findOne(ordenId);
     const row = await this.exportacionRepo.findOne({ where: { ordenVentaId: ordenId } });
     if (!row) return [];
-    const field = tipo === 'documentos' ? 'documentosAsociados' : 'reportesCalidad';
-    const current: { name: string; file: string }[] = Array.isArray((row as any)[field])
-      ? (row as any)[field]
+    const current: { name: string; file: string }[] = Array.isArray(row.filesMap?.[tipo])
+      ? (row.filesMap![tipo] as { name: string; file: string }[])
       : [];
     const updated = current.filter(f => f.file !== filename);
-    (row as any)[field] = updated.length ? updated : null;
+    row.filesMap = { ...(row.filesMap ?? {}), [tipo]: updated.length ? updated : [] };
     await this.exportacionRepo.save(row);
     const filePath = join(process.cwd(), 'uploads', 'exportacion', String(ordenId), tipo, filename);
     if (existsSync(filePath)) {
@@ -392,5 +401,36 @@ export class OrdenesVentaService {
     if (!row) row = this.postVentaRepo.create({ ordenVentaId: ordenId });
     Object.assign(row, dto);
     return this.postVentaRepo.save(row);
+  }
+
+  async uploadPostVentaFile(ordenId: number, tipo: string, file: any): Promise<{ name: string; file: string }[]> {
+    await this.findOne(ordenId);
+    let row = await this.postVentaRepo.findOne({ where: { ordenVentaId: ordenId } });
+    if (!row) row = this.postVentaRepo.create({ ordenVentaId: ordenId });
+    const entry = { name: file.originalname as string, file: file.filename as string };
+    const current: { name: string; file: string }[] = Array.isArray(row.filesMapPostVenta?.[tipo])
+      ? (row.filesMapPostVenta![tipo] as { name: string; file: string }[])
+      : [];
+    const updated = [...current, entry];
+    row.filesMapPostVenta = { ...(row.filesMapPostVenta ?? {}), [tipo]: updated };
+    await this.postVentaRepo.save(row);
+    return updated;
+  }
+
+  async deletePostVentaFile(ordenId: number, tipo: string, filename: string): Promise<{ name: string; file: string }[]> {
+    await this.findOne(ordenId);
+    const row = await this.postVentaRepo.findOne({ where: { ordenVentaId: ordenId } });
+    if (!row) return [];
+    const current: { name: string; file: string }[] = Array.isArray(row.filesMapPostVenta?.[tipo])
+      ? (row.filesMapPostVenta![tipo] as { name: string; file: string }[])
+      : [];
+    const updated = current.filter(f => f.file !== filename);
+    row.filesMapPostVenta = { ...(row.filesMapPostVenta ?? {}), [tipo]: updated.length ? updated : [] };
+    await this.postVentaRepo.save(row);
+    const filePath = join(process.cwd(), 'uploads', 'post-venta', String(ordenId), tipo, filename);
+    if (existsSync(filePath)) {
+      try { unlinkSync(filePath); } catch { /* already gone */ }
+    }
+    return updated;
   }
 }

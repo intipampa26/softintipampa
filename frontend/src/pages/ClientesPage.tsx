@@ -198,9 +198,10 @@ function ClienteModal({ initial, onClose, onSave }: ModalFormProps) {
               <label className={labelCls}>Teléfono</label>
               <input
                 value={form.telefono ?? ''}
-                onChange={(e) => set('telefono', e.target.value)}
+                onChange={(e) => set('telefono', e.target.value.replace(/\D/g, ''))}
                 className={inputCls}
                 placeholder="Número de contacto…"
+                inputMode="numeric"
                 maxLength={20}
               />
             </div>

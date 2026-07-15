@@ -82,10 +82,13 @@ export function AlistadoCompromisoVentaModal({ orden, onClose, onGoToStep }: Pro
             </div>
             <div>
               {fieldLabel('Comprador / Cliente')}
-              <input value={comprador} onChange={e => setComprador(e.target.value)} className={INP} style={inpStyle} placeholder="Razón social…" />
+              <div className="flex items-center gap-2 border rounded-xl px-3 py-2.5 bg-gray-50" style={{ borderColor: BD }}>
+                <span className="flex-1 text-sm font-semibold truncate" style={{ color: TX }}>{comprador || '—'}</span>
+                <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded" style={{ background: '#D1FAE5', color: '#065F46' }}>bloqueado</span>
+              </div>
             </div>
             <div>
-              {fieldLabel(`Precio acordado (${moneda} / kg)`)}
+              {fieldLabel('Total de venta')}
               <div className="flex gap-2">
                 <div className="flex rounded-xl overflow-hidden border shrink-0" style={{ borderColor: BD }}>
                   {(['USD', 'PEN'] as const).map(m => (

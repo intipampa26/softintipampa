@@ -127,7 +127,7 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
               )}
             </div>
             <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Malla *</label><select value={form.malla ?? ''} onChange={e => setForm(f => ({ ...f, malla: e.target.value || undefined }))} className={cls}><option value="">Seleccionar…</option>{['14','15','16','-14'].map(m => <option key={m} value={m}>{m}</option>)}</select></div>
-            <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Tipo Selección *</label><input value={form.tipoSeleccion ?? ''} onChange={e => setForm(f => ({ ...f, tipoSeleccion: e.target.value || undefined }))} className={cls} /></div>
+            <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Tipo Selección *</label><select value={form.tipoSeleccion ?? ''} onChange={e => setForm(f => ({ ...f, tipoSeleccion: e.target.value || undefined }))} className={cls}><option value="">Seleccionar…</option>{['MCM','MC','Selección manual','EP'].map(t => <option key={t} value={t}>{t}</option>)}</select></div>
           </div>
           <div><label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Encargado *</label><input value={form.encargado ?? ''} onChange={e => setForm(f => ({ ...f, encargado: e.target.value || undefined }))} className={cls} /></div>
 
@@ -376,7 +376,7 @@ export function LotesFinalesPage() {
               <table className="w-full text-sm min-w-[700px]">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50">
-                    {['Código LF', 'Origen', 'Tipo', 'Cantidad (kg)', 'Estado', 'Campaña', ''].map(h => (
+                    {['Código LF', 'Tipo', 'SKU', 'Variedad', 'Productor', 'Cantidad (kg)', 'Estado', 'Campaña', ''].map(h => (
                       <th key={h} className="text-left px-5 py-3 text-[0.68rem] font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -385,8 +385,10 @@ export function LotesFinalesPage() {
                   {lfs.map(lf => (
                     <tr key={lf.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-4 font-semibold text-gray-800">{lf.codigo}</td>
-                      <td className="px-5 py-4 text-xs text-gray-500">{ORIGEN_LABEL[lf.tipoOrigen]}</td>
                       <td className="px-5 py-4 text-xs font-bold text-gray-600">{lf.tipoProducto?.tipo ?? `#${lf.tipoProductoId}`}</td>
+                      <td className="px-5 py-4 text-xs text-gray-500">{lf.sku?.nombre ?? '—'}</td>
+                      <td className="px-5 py-4 text-xs text-gray-500">{(lf as any).variedad ?? '—'}</td>
+                      <td className="px-5 py-4 text-xs text-gray-500">{(lf as any).productor ? `${(lf as any).productor.nombre}${(lf as any).productor.apellido ? ' ' + (lf as any).productor.apellido : ''}` : '—'}</td>
                       <td className="px-5 py-4 font-semibold text-gray-800 tabular-nums">{Number(lf.cantidadKg).toFixed(2)}</td>
                       <td className="px-5 py-4"><span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${ESTADO_COLOR[lf.estado]}`}>{ESTADO_LABEL[lf.estado]}</span></td>
                       <td className="px-5 py-4 text-xs text-gray-500">{lf.campana?.nombre ?? '—'}</td>

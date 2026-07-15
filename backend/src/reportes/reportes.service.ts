@@ -9,6 +9,7 @@ import { Lote }       from '../lotes/lote.entity';
 import { LoteFinal }  from '../lotes-finales/lote-final.entity';
 import { Muestra }    from '../muestras/muestra.entity';
 import { OrdenVenta } from '../ordenes-venta/orden-venta.entity';
+import { Parcela }    from '../parcelas/parcela.entity';
 
 export interface ExportFilters {
   campanaId?:  number;
@@ -28,6 +29,7 @@ export class ReportesService {
     @InjectRepository(LoteFinal)  private loteFinalRepo:   Repository<LoteFinal>,
     @InjectRepository(Muestra)    private muestraRepo:     Repository<Muestra>,
     @InjectRepository(OrdenVenta) private ordenVentaRepo:  Repository<OrdenVenta>,
+    @InjectRepository(Parcela)    private parcelaRepo:     Repository<Parcela>,
   ) {}
 
   async getFilterOptions() {
@@ -725,6 +727,43 @@ export class ReportesService {
     }));
 
     return this.buildExcel('Ventas', rows);
+  }
+
+  async exportParcelas(f: ExportFilters = {}): Promise<Buffer> {
+    const qb = this.parcelaRepo.createQueryBuilder('pa')
+      .leftJoinAndSelect('pa.productor', 'pr')
+      .where('pa.activo = true')
+      .orderBy('pr.apellido', 'ASC')
+      .addOrderBy('pa.codigo', 'ASC');
+
+    if (f.campanaId)  qb.andWhere('pr.campanaId = :campanaId', { campanaId: f.campanaId });
+    if (f.fecha)      qb.andWhere('pa.fechaRegistro = :fecha', { fecha: f.fecha });
+    if (f.fechaDesde) qb.andWhere('pa.fechaRegistro >= :fechaDesde', { fechaDesde: f.fechaDesde });
+    if (f.fechaHasta) qb.andWhere('pa.fechaRegistro <= :fechaHasta', { fechaHasta: f.fechaHasta });
+
+    const parcelas = await qb.getMany();
+
+    const rows = parcelas.map((pa, i) => ({
+      'N°':                      i + 1,
+      'Código':                  pa.codigo,
+      'Nombre':                  pa.nombre,
+      'Tipo Producto':           pa.tipoProducto ?? '',
+      'Productor':               (pa as any).productor ? `${(pa as any).productor.nombre} ${(pa as any).productor.apellido ?? ''}`.trim() : '',
+      'Área Total Finca (ha)':   pa.areaTotalFinca != null ? Number(pa.areaTotalFinca) : '',
+      'Hectáreas Café':          pa.hectareasCafe != null ? Number(pa.hectareasCafe) : '',
+      'Variedades Café':         pa.variedadesCafe ?? '',
+      'Altitud (msnm)':          pa.altitud ?? '',
+      'Estado Propiedad':        pa.estadoPropiedad ?? '',
+      'Tiene PPA':               pa.tienePpa ?? '',
+      'Producción 2023 (kg)':    pa.produccion2023 != null ? Number(pa.produccion2023) : '',
+      'Tipo Beneficio':          pa.tipoBeneficio ?? '',
+      'Tipo Secado':             pa.tipoSecado ?? '',
+      'Periodo Cosecha':         pa.periodoCosecha ?? '',
+      'Controles Biológicos':    pa.controlesBiologicos != null ? (pa.controlesBiologicos ? 'Sí' : 'No') : '',
+      'Fecha Registro':          pa.fechaRegistro ?? '',
+    }));
+
+    return this.buildExcel('Parcelas', rows);
   }
 
   private buildExcel(sheetName: string, rows: Record<string, unknown>[]): Buffer {

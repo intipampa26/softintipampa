@@ -98,6 +98,21 @@ export class ReportesController {
     res.send(buffer);
   }
 
+  @Get('export/parcelas')
+  async exportParcelas(
+    @Query('campanaId') campanaId: string | undefined,
+    @Query('fecha')      fecha:      string | undefined,
+    @Query('fechaDesde') fechaDesde: string | undefined,
+    @Query('fechaHasta') fechaHasta: string | undefined,
+    @Res() res: Response,
+  ) {
+    const f: ExportFilters = { campanaId: campanaId ? Number(campanaId) : undefined, fecha, fechaDesde, fechaHasta };
+    const buffer = await this.service.exportParcelas(f);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="parcelas.xlsx"');
+    res.send(buffer);
+  }
+
   @Get('acopio/resumen')
   getAcopioResumen(@Query('campanaId') campanaId?: string) {
     return this.service.getAcopioResumen(campanaId ? Number(campanaId) : undefined);

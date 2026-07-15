@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, CheckCircle2, Package, Truck, Calendar, ChevronDown, Upload, Trash2, FileText, Search, Plus } from 'lucide-react';
+import { X, CheckCircle2, Package, Truck, Calendar, ChevronDown, Upload, Trash2, FileText, Search, Plus, Loader2 } from 'lucide-react';
 import { ModalLoadingOverlay } from '@/components/ui/ModalLoadingOverlay';
 import { useToast } from '@/contexts/ToastContext';
 import { ordenesVentaService } from '../services/ordenes-venta.service';
 import { lotesFinalesService, LoteFinal } from '@/services/lotes-finales.service';
 import { campanasService } from '@/services/campanas.service';
+import { productoresService } from '@/services/productores.service';
+import { skusService, Sku } from '@/services/skus.service';
 
 const CP = '#445D46';
 const BD = '#D9DDD8';
@@ -18,19 +20,36 @@ const fieldLabel = (label: string) => (
   <label className="block text-[0.65rem] font-bold uppercase tracking-wide mb-1.5" style={{ color: TX, opacity: 0.55 }}>{label}</label>
 );
 
-const INCOTERMS   = ['FOB','CIF','EXW','FCA','CPT','DAP','DDP'];
-const CONDICIONES = ['30 días','60 días','90 días','Carta de crédito','Contra entrega'];
+const INCOTERMS    = ['FOB','CIF','EXW','FCA','CPT','DAP','DDP'];
+const CONDICIONES  = ['30 días','60 días','90 días','Carta de crédito','Contra entrega'];
+const TIPOS_EMPAQUE = ['Sacos 46','Sacos 69','Sacos 50','Sacos 25','Sacos 20','Caja','Unidad','Big bag'];
+const PLANTAS       = ['CB jaen','CB lima','Expocafé','Kuska','Mego','Selva norte','Aicasa','Norandino','Negrisa','Otro'];
 
 type Tab = 'compromiso' | 'lotes' | 'despacho';
 
 interface LoteAsignadoItem {
-  loteFinalId: number;
-  codigo: string;
+  loteFinalId:  number;
+  codigo:       string;
   descripcion?: string;
-  cantidadKg: number | null;
-  nroSacos: number | null;
-  fechaProceso: string | null;
-  esManual?: boolean;
+  cantidadKg:   number | null;
+  nroSacos:     number | null;
+  precio:       number | null;
+  paleta:       number | null;
+  esManual?:    boolean;
+}
+
+interface DespachoItem {
+  id:                string;
+  fechaDespacho:     string;
+  fechaRecepcion:    string;
+  origen:            string;
+  destino:           string;
+  empresaTransporte: string;
+  costoTransporte:   string;
+  costoEstiba:       string;
+  costoViaticos:     string;
+  responsable:       string;
+  kilosDepachados:   string;
 }
 
 interface Props {
@@ -75,9 +94,13 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
   const [fechaContrato,         setFechaContrato]         = useState('');
   const [comprador,             setComprador]             = useState(orden.cliente ?? '');
   const [precioUsd,             setPrecioUsd]             = useState('');
+  const [monedaCompromiso,      setMonedaCompromiso]      = useState<'USD' | 'PEN'>('USD');
   const [cantidadKgCompromiso,  setCantidadKgCompromiso]  = useState('');
   const [incoterm,              setIncoterm]              = useState('');
   const [condPago,              setCondPago]              = useState('');
+  const [puertoDestino,         setPuertoDestino]         = useState('');
+  const [mesExportacion,        setMesExportacion]        = useState('');
+  const [tipoExportacion,       setTipoExportacion]       = useState('');
   const [fechaEntrega,          setFechaEntrega]          = useState('');
   const [notasCompromiso,       setNotasCompromiso]       = useState('');
 
@@ -91,14 +114,22 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
   const [costoEstiba,    setCostoEstiba]    = useState('');
   const [costoEmpaque,   setCostoEmpaque]   = useState('');
   const [costoTransporte,setCostoTransporte]= useState('');
-  const [separarAlistado,setSepararAlistado]= useState(false);
-  const [planAlistado,   setPlanAlistado]   = useState(false);
-  const [costViaticos,   setCostViaticos]   = useState(false);
+  const [costosViaticos, setCostosViaticos] = useState('');
+  const [plantaCustom,   setPlantaCustom]   = useState('');
+  const [codigoExportacion, setCodigoExportacion] = useState('');
 
-  const [lotesDisponibles,  setLotesDisponibles]  = useState<LoteFinal[]>([]);
-  const [lotesAsignados,    setLotesAsignados]    = useState<LoteAsignadoItem[]>([]);
-  const [loadingLotes,      setLoadingLotes]      = useState(false);
-  const [lotesSearch,       setLotesSearch]       = useState('');
+  const [despachos,            setDespachos]            = useState<DespachoItem[]>([]);
+  const [lotesResultados,      setLotesResultados]      = useState<LoteFinal[]>([]);
+  const [lotesAsignados,       setLotesAsignados]       = useState<LoteAsignadoItem[]>([]);
+  const [loadingLotes,         setLoadingLotes]         = useState(false);
+  const [lotesSearch,          setLotesSearch]          = useState('');
+  const [lotesFilterProductor, setLotesFilterProductor] = useState('');
+  const [lotesFilterSku,       setLotesFilterSku]       = useState('');
+  const [campanaIdLotes,       setCampanaIdLotes]       = useState<number | null>(null);
+  const [productoresLotes,     setProductoresLotes]     = useState<{ id: number; nombre: string }[]>([]);
+  const [skusLotes,            setSkusLotes]            = useState<Sku[]>([]);
+  const [skusOtros,            setSkusOtros]            = useState<Sku[]>([]);
+  const debounceRefLotes = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -110,9 +141,13 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
           setFechaContrato(data.fechaContrato ?? '');
           setComprador(data.comprador ?? orden.cliente ?? '');
           setPrecioUsd(data.precioUsd != null ? String(data.precioUsd) : '');
+          if (data.monedaCompromiso) setMonedaCompromiso(data.monedaCompromiso as 'USD' | 'PEN');
           setCantidadKgCompromiso(data.cantidadKgCompromiso != null ? String(data.cantidadKgCompromiso) : '');
           setIncoterm(data.incoterm ?? '');
           setCondPago(data.condPago || cot?.condicionesPago || '');
+          setPuertoDestino(data.puertoDestino ?? cot?.puerto ?? '');
+          setMesExportacion(data.mesExportacion ?? (cot?.validezDias != null ? String(cot.validezDias) : ''));
+          setTipoExportacion(data.tipoExportacion ?? '');
           setFechaEntrega(data.fechaEntrega ?? '');
           setNotasCompromiso(data.notasCompromiso ?? '');
           setPlanta(data.planta ?? '');
@@ -125,14 +160,17 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
           setCostoEstiba(data.costoEstiba != null ? String(data.costoEstiba) : '');
           setCostoEmpaque(data.costoEmpaque != null ? String(data.costoEmpaque) : '');
           setCostoTransporte(data.costoTransporte != null ? String(data.costoTransporte) : '');
-          setSepararAlistado(data.separarAlistado ?? false);
-          setPlanAlistado(data.planAlistado ?? false);
-          setCostViaticos(data.costViaticos ?? false);
+          setCostosViaticos(data.costosViaticos != null ? String(data.costosViaticos) : (data.costViaticos ? '' : ''));
+          setCodigoExportacion(data.codigoExportacion ?? '');
+          if (data.planta === 'Otro' && data.plantaCustom) setPlantaCustom(data.plantaCustom);
           setContratoFileName(data.contratoFileName ?? null);
           setContratoFilePath(data.contratoFilePath ?? null);
           if (Array.isArray(data.lotesAsignados)) setLotesAsignados(data.lotesAsignados);
-        } else if (cot?.condicionesPago) {
-          setCondPago(cot.condicionesPago);
+          if (Array.isArray(data.despachos))      setDespachos(data.despachos);
+        } else if (cot) {
+          if (cot.condicionesPago) setCondPago(cot.condicionesPago);
+          if (cot.puerto)          setPuertoDestino(cot.puerto);
+          if (cot.validezDias != null) setMesExportacion(String(cot.validezDias));
         }
       })
       .catch(() => {})
@@ -141,17 +179,63 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
 
   useEffect(() => {
     if (!orden.campana) return;
-    setLoadingLotes(true);
     campanasService.getPage(1, 200)
       .then(campanasData => {
         const campanaObj = campanasData.data.find(c => c.nombre === orden.campana);
         if (!campanaObj) return;
-        return lotesFinalesService.getPage({ campanaId: campanaObj.id, limit: 500 });
+        setCampanaIdLotes(campanaObj.id);
+        return Promise.all([
+          productoresService.getPage(1, 500, campanaObj.id),
+          skusService.findAll({ soloOtros: false }),
+          skusService.findAll({ soloOtros: true }),
+        ]);
       })
-      .then(res => { if (res) setLotesDisponibles(res.data); })
-      .catch(() => {})
-      .finally(() => setLoadingLotes(false));
+      .then(res => {
+        if (!res) return;
+        const [prodRes, skuRes, otrosRes] = res;
+        setProductoresLotes((prodRes.data as any[]).map((p: any) => ({
+          id:     p.id,
+          nombre: `${p.nombre}${p.apellido ? ' ' + p.apellido : ''}`.trim(),
+        })));
+        setSkusLotes(skuRes);
+        setSkusOtros(otrosRes);
+      })
+      .catch(() => {});
   }, [orden.campana]);
+
+  useEffect(() => {
+    if (!campanaIdLotes) return;
+    if (!lotesSearch && !lotesFilterProductor && !lotesFilterSku) return;
+    if (debounceRefLotes.current) clearTimeout(debounceRefLotes.current);
+    debounceRefLotes.current = setTimeout(async () => {
+      setLoadingLotes(true);
+      try {
+        const prodId = productoresLotes.find(p => p.nombre === lotesFilterProductor)?.id;
+        const result = await lotesFinalesService.getPage({ campanaId: campanaIdLotes, productorId: prodId, limit: 300 });
+        let data = result.data;
+        if (lotesFilterSku) data = data.filter(l => (l.sku?.nombre ?? '') === lotesFilterSku);
+        if (lotesSearch) {
+          const q = lotesSearch.toLowerCase();
+          data = data.filter(l =>
+            l.codigo.toLowerCase().includes(q) ||
+            (l.tipoProducto?.tipo ?? '').toLowerCase().includes(q) ||
+            (l.sku?.nombre ?? '').toLowerCase().includes(q)
+          );
+        }
+        setLotesResultados(data);
+      } catch { /* silencioso */ }
+      finally { setLoadingLotes(false); }
+    }, 5000);
+    return () => { if (debounceRefLotes.current) clearTimeout(debounceRefLotes.current); };
+  }, [lotesSearch, lotesFilterProductor, lotesFilterSku, campanaIdLotes, productoresLotes]);
+
+  const generateOtroCode = () => {
+    const existing = lotesAsignados.filter(a => a.esManual && /^OTR-\d+$/.test(a.codigo));
+    const nums = existing.map(a => parseInt(a.codigo.replace('OTR-', '')) || 0);
+    const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+    return `OTR-${String(next).padStart(3, '0')}`;
+  };
+
 
   const handleUploadContrato = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -184,9 +268,13 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
         fechaContrato:        fechaContrato        || null,
         comprador:            comprador            || null,
         precioUsd:            precioUsd            ? parseFloat(precioUsd)            : null,
+        monedaCompromiso:     monedaCompromiso,
         cantidadKgCompromiso: cantidadKgCompromiso ? parseFloat(cantidadKgCompromiso) : null,
         incoterm:             incoterm             || null,
         condPago:             condPago             || null,
+        puertoDestino:        puertoDestino        || null,
+        mesExportacion:       mesExportacion       || null,
+        tipoExportacion:      tipoExportacion      || null,
         fechaEntrega:         fechaEntrega         || null,
         notasCompromiso:      notasCompromiso      || null,
         planta:               planta               || null,
@@ -199,10 +287,11 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
         costoEstiba:          costoEstiba          ? parseFloat(costoEstiba)    : null,
         costoEmpaque:         costoEmpaque         ? parseFloat(costoEmpaque)   : null,
         costoTransporte:      costoTransporte      ? parseFloat(costoTransporte): null,
-        separarAlistado,
-        planAlistado,
-        costViaticos,
+        costosViaticos:       costosViaticos       ? parseFloat(costosViaticos) : null,
+        plantaCustom:         planta === 'Otro'    ? (plantaCustom || null)     : null,
+        codigoExportacion:    codigoExportacion    || null,
         lotesAsignados: lotesAsignados.length > 0 ? lotesAsignados : null,
+        despachos: despachos.length > 0 ? despachos : null,
       };
       await ordenesVentaService.upsertAlistado(orden.dbId, dto);
       toast.success('Guardado correctamente');
@@ -212,15 +301,16 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
       setSaving(false);
     }
   }, [
-    nroContrato, fechaContrato, comprador, precioUsd, cantidadKgCompromiso,
-    incoterm, condPago, fechaEntrega, notasCompromiso,
-    planta, fechaAlistado, guiaRemision, fechaTraslado, tipoEmpaque, transporte,
-    costoPlanta, costoEstiba, costoEmpaque, costoTransporte,
-    separarAlistado, planAlistado, costViaticos, lotesAsignados, orden.dbId,
+    nroContrato, fechaContrato, comprador, precioUsd, monedaCompromiso, cantidadKgCompromiso,
+    incoterm, condPago, puertoDestino, mesExportacion, tipoExportacion, fechaEntrega, notasCompromiso,
+    planta, plantaCustom, fechaAlistado, guiaRemision, fechaTraslado, tipoEmpaque, transporte,
+    costoPlanta, costoEstiba, costoEmpaque, costoTransporte, costosViaticos, codigoExportacion,
+    lotesAsignados, despachos, orden.dbId,
   ]);
 
   const totalCompromiso = precioUsd && cantidadKgCompromiso
     ? parseFloat(precioUsd) * parseFloat(cantidadKgCompromiso) : 0;
+  const monedaCompromisoSymbol = monedaCompromiso === 'PEN' ? 'S/.' : 'USD';
 
   const totalCostos = [costoPlanta, costoEstiba, costoEmpaque, costoTransporte]
     .reduce((s, v) => s + (parseFloat(v) || 0), 0);
@@ -284,8 +374,19 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
                   <input value={comprador} readOnly className={INP} style={{ ...inpStyle, backgroundColor: '#F3F4F6', cursor: 'default', color: '#6B7280' }} />
                 </div>
                 <div>
-                  {fieldLabel('Precio acordado (USD / kg)')}
-                  <input type="number" min={0} step="0.01" value={precioUsd} onChange={e => setPrecioUsd(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+                  {fieldLabel('Total de venta')}
+                  <div className="flex gap-2">
+                    <div className="flex rounded-xl overflow-hidden border shrink-0" style={{ borderColor: BD }}>
+                      {(['USD', 'PEN'] as const).map(m => (
+                        <button key={m} type="button" onClick={() => setMonedaCompromiso(m)}
+                          className="px-3 py-2 text-xs font-bold transition-colors"
+                          style={{ backgroundColor: monedaCompromiso === m ? CP : '#fff', color: monedaCompromiso === m ? '#fff' : '#6B7280' }}>
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                    <input type="number" min={0} step="0.01" value={precioUsd} onChange={e => setPrecioUsd(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+                  </div>
                 </div>
                 <div>
                   {fieldLabel('Cantidad comprometida (kg)')}
@@ -312,6 +413,25 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
                   </div>
                 </div>
                 <div>
+                  {fieldLabel('Puerto de destino')}
+                  <input value={puertoDestino} onChange={e => setPuertoDestino(e.target.value)} className={INP} style={inpStyle} placeholder="Callao, Rotterdam…" />
+                </div>
+                <div>
+                  {fieldLabel('Mes de exportación (est.)')}
+                  <input type="month" value={mesExportacion} onChange={e => setMesExportacion(e.target.value)} className={INP} style={inpStyle} />
+                </div>
+                <div>
+                  {fieldLabel('Tipo de exportación')}
+                  <div className="relative">
+                    <select value={tipoExportacion} onChange={e => setTipoExportacion(e.target.value)} className={`${INP} pr-9 appearance-none`} style={inpStyle}>
+                      <option value="">Seleccionar…</option>
+                      <option>LCL/FCL</option>
+                      <option>Consolidada con Tercero</option>
+                    </select>
+                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+                <div>
                   {fieldLabel('Fecha de entrega estimada')}
                   <div className="relative">
                     <input type="date" value={fechaEntrega} onChange={e => setFechaEntrega(e.target.value)} className={INP} style={inpStyle} />
@@ -322,7 +442,7 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
               {totalCompromiso > 0 && (
                 <div className="rounded-xl px-4 py-3 flex items-center gap-3" style={{ backgroundColor: `${CP}12` }}>
                   <p className="text-[0.65rem] font-bold uppercase tracking-wide" style={{ color: CP }}>Total comprometido:</p>
-                  <p className="font-black text-base" style={{ color: CP }}>USD {totalCompromiso.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-black text-base" style={{ color: CP }}>{monedaCompromisoSymbol} {totalCompromiso.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
                 </div>
               )}
               <div>
@@ -387,12 +507,13 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
                     <button
                       onClick={() => setLotesAsignados(prev => [...prev, {
                         loteFinalId: -(Date.now()),
-                        codigo: '',
+                        codigo:      generateOtroCode(),
                         descripcion: '',
-                        cantidadKg: null,
-                        nroSacos: null,
-                        fechaProceso: null,
-                        esManual: true,
+                        cantidadKg:  null,
+                        nroSacos:    null,
+                        precio:      null,
+                        paleta:      null,
+                        esManual:    true,
                       }])}
                       className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.6rem] font-black uppercase tracking-wide transition-all hover:opacity-90"
                       style={{ backgroundColor: 'rgba(255,255,255,0.22)', color: '#fff' }}
@@ -401,164 +522,196 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
                     </button>
                   </div>
                 </div>
-                <div className="px-4 py-3 border-b" style={{ borderColor: '#B8DDB8', backgroundColor: '#F0F7F0' }}>
+                <div className="px-4 py-3 border-b space-y-2" style={{ borderColor: '#B8DDB8', backgroundColor: '#F0F7F0' }}>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <select value={lotesFilterProductor} onChange={e => setLotesFilterProductor(e.target.value)} className="w-full pl-3 pr-7 py-2 text-xs rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-green-600 appearance-none" style={{ borderColor: '#B8DDB8' }}>
+                        <option value="">Todos los productores</option>
+                        {productoresLotes.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                      </select>
+                      <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    </div>
+                    <div className="relative flex-1">
+                      <select value={lotesFilterSku} onChange={e => setLotesFilterSku(e.target.value)} className="w-full pl-3 pr-7 py-2 text-xs rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-green-600 appearance-none" style={{ borderColor: '#B8DDB8' }}>
+                        <option value="">Todos los SKUs</option>
+                        {skusLotes.map(s => <option key={s.id} value={s.nombre}>{s.nombre}</option>)}
+                      </select>
+                      <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
                   <div className="relative">
                     <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                       value={lotesSearch}
                       onChange={e => setLotesSearch(e.target.value)}
-                      placeholder="Buscar lote por código o tipo…"
+                      placeholder="Buscar lote por código, tipo o SKU…"
                       className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border bg-white focus:outline-none focus:ring-2 focus:ring-green-600"
                       style={{ borderColor: '#B8DDB8' }}
                     />
                   </div>
                 </div>
                 {loadingLotes ? (
-                  <div className="flex items-center justify-center py-10">
-                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    <span className="ml-2 text-xs text-gray-400">Cargando lotes…</span>
+                  <div className="flex items-center justify-center gap-2 py-10 text-gray-400">
+                    <Loader2 size={15} className="animate-spin" style={{ color: '#4E644E' }} />
+                    <span className="text-xs">Buscando lotes…</span>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[640px] text-xs">
+                    <table className="w-full min-w-[900px] text-xs">
                       <thead>
                         <tr style={{ backgroundColor: '#E8F3E8' }}>
-                          {['CÓDIGO', 'SKU', 'PRODUCTO', 'DISPONIBLE', 'KG ASIGNADOS', '# SACOS', 'FECHA PROCESO', 'ACCIONES'].map(h => (
+                          {['SKU','TIPO PRODUCTO','PESO (kg)','VALOR (USD/kg)','TIPO EMPAQUE','KG ASIG.','# SACOS','PALETA','PARTIDA ARANC.','ACCIONES'].map(h => (
                             <th key={h} className="px-3 py-2.5 text-left font-black uppercase tracking-wide whitespace-nowrap" style={{ color: '#4E644E', fontSize: '0.6rem' }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {lotesDisponibles
-                          .filter(l => !lotesSearch || l.codigo.toLowerCase().includes(lotesSearch.toLowerCase()) || (l.tipoProducto?.tipo ?? '').toLowerCase().includes(lotesSearch.toLowerCase()))
-                          .map(lote => {
+                        {lotesResultados.length === 0 && !loadingLotes && (
+                          <tr>
+                            <td colSpan={10} className="px-3 py-10 text-center text-xs text-gray-400">
+                              {(lotesSearch || lotesFilterProductor || lotesFilterSku)
+                                ? 'Sin resultados para los filtros aplicados'
+                                : 'Usa los filtros de arriba para buscar lotes (búsqueda automática en 5 seg)'}
+                            </td>
+                          </tr>
+                        )}
+                        {lotesResultados.map(lote => {
                             const asig = lotesAsignados.find(a => a.loteFinalId === lote.id);
-                            const needsFito = !!(asig && lote.sku?.requiereFito);
+                            const tienePartida = lote.sku?.codigoHS != null;
                             return (
                               <tr
                                 key={lote.id}
                                 className="border-t transition-colors"
                                 style={{
                                   borderColor: '#E8F3E8',
-                                  backgroundColor: needsFito ? '#FFFBEB' : asig ? '#F0F7F0' : undefined,
-                                  borderLeft: needsFito ? '3px solid #D97706' : asig ? '3px solid #4E644E' : '3px solid transparent',
+                                  backgroundColor: asig ? '#F0F7F0' : undefined,
+                                  borderLeft: asig ? '3px solid #4E644E' : '3px solid transparent',
                                 }}
                               >
-                                <td className="px-3 py-2.5 font-bold" style={{ color: '#4E644E' }}>{lote.codigo}</td>
                                 <td className="px-3 py-2.5">
                                   {lote.sku?.nombre
                                     ? <span className="px-2 py-0.5 rounded-full text-[0.58rem] font-bold bg-green-50 text-green-700">{lote.sku.nombre}</span>
                                     : <span className="text-gray-400">—</span>}
                                 </td>
                                 <td className="px-3 py-2.5 text-gray-600">{lote.tipoProducto?.tipo ?? '—'}</td>
+                                {/* PESO (kg) display */}
                                 <td className="px-3 py-2.5 font-semibold" style={{ color: '#4E644E' }}>{Number(lote.cantidadKg).toLocaleString()} kg</td>
+                                {/* VALOR (USD/kg) input */}
                                 <td className="px-3 py-2">
                                   <input
-                                    type="number"
-                                    min={0}
-                                    value={asig?.cantidadKg ?? ''}
-                                    placeholder="0"
+                                    type="number" min={0} step="0.01" value={asig?.precio ?? ''} placeholder="0.00"
                                     onChange={e => {
                                       const val = e.target.value === '' ? null : Number(e.target.value);
                                       setLotesAsignados(prev => {
                                         const exists = prev.find(a => a.loteFinalId === lote.id);
-                                        if (exists) return prev.map(a => a.loteFinalId === lote.id ? { ...a, cantidadKg: val } : a);
-                                        return [...prev, { loteFinalId: lote.id, codigo: lote.codigo, cantidadKg: val, nroSacos: null, fechaProceso: null }];
+                                        if (exists) return prev.map(a => a.loteFinalId === lote.id ? { ...a, precio: val } : a);
+                                        return [...prev, { loteFinalId: lote.id, codigo: lote.codigo, cantidadKg: null, nroSacos: null, precio: val, paleta: null }];
                                       });
                                     }}
                                     className="w-24 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-600 bg-white"
                                     style={{ borderColor: '#B8DDB8' }}
                                   />
                                 </td>
+                                {/* TIPO EMPAQUE display */}
+                                <td className="px-3 py-2.5 text-gray-500 text-[0.6rem]">
+                                  {(lote as any).tipoEmpaque ?? '—'}
+                                </td>
+                                {/* KG ASIG. input */}
                                 <td className="px-3 py-2">
                                   <input
-                                    type="number"
-                                    min={0}
-                                    value={asig?.nroSacos ?? ''}
-                                    placeholder="0"
+                                    type="number" min={0} value={asig?.cantidadKg ?? ''} placeholder="0"
+                                    onChange={e => {
+                                      const val = e.target.value === '' ? null : Number(e.target.value);
+                                      setLotesAsignados(prev => {
+                                        const exists = prev.find(a => a.loteFinalId === lote.id);
+                                        if (exists) return prev.map(a => a.loteFinalId === lote.id ? { ...a, cantidadKg: val } : a);
+                                        return [...prev, { loteFinalId: lote.id, codigo: lote.codigo, cantidadKg: val, nroSacos: null, precio: null, paleta: null }];
+                                      });
+                                    }}
+                                    className="w-24 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-600 bg-white"
+                                    style={{ borderColor: '#B8DDB8' }}
+                                  />
+                                </td>
+                                {/* # SACOS input */}
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="number" min={0} value={asig?.nroSacos ?? ''} placeholder="0"
                                     onChange={e => {
                                       const val = e.target.value === '' ? null : Number(e.target.value);
                                       setLotesAsignados(prev => {
                                         const exists = prev.find(a => a.loteFinalId === lote.id);
                                         if (exists) return prev.map(a => a.loteFinalId === lote.id ? { ...a, nroSacos: val } : a);
-                                        return [...prev, { loteFinalId: lote.id, codigo: lote.codigo, cantidadKg: null, nroSacos: val, fechaProceso: null }];
+                                        return [...prev, { loteFinalId: lote.id, codigo: lote.codigo, cantidadKg: null, nroSacos: val, precio: null, paleta: null }];
                                       });
                                     }}
                                     className="w-20 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-600 bg-white"
                                     style={{ borderColor: '#B8DDB8' }}
                                   />
                                 </td>
+                                {/* PALETA input */}
                                 <td className="px-3 py-2">
                                   <input
-                                    type="date"
-                                    value={asig?.fechaProceso ?? ''}
+                                    type="number" min={0} value={asig?.paleta ?? ''} placeholder="0"
                                     onChange={e => {
-                                      const val = e.target.value || null;
+                                      const val = e.target.value === '' ? null : Number(e.target.value);
                                       setLotesAsignados(prev => {
                                         const exists = prev.find(a => a.loteFinalId === lote.id);
-                                        if (exists) return prev.map(a => a.loteFinalId === lote.id ? { ...a, fechaProceso: val } : a);
-                                        return [...prev, { loteFinalId: lote.id, codigo: lote.codigo, cantidadKg: null, nroSacos: null, fechaProceso: val }];
+                                        if (exists) return prev.map(a => a.loteFinalId === lote.id ? { ...a, paleta: val } : a);
+                                        return [...prev, { loteFinalId: lote.id, codigo: lote.codigo, cantidadKg: null, nroSacos: null, precio: null, paleta: val }];
                                       });
                                     }}
-                                    className="border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-600 bg-white"
+                                    className="w-16 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-600 bg-white"
                                     style={{ borderColor: '#B8DDB8' }}
                                   />
                                 </td>
+                                <td className="px-3 py-2.5 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full text-[0.58rem] font-black ${tienePartida ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                                    {tienePartida ? 'Requiere' : 'No'}
+                                  </span>
+                                </td>
                                 <td className="px-3 py-2">
-                                  <div className="flex items-center gap-1.5">
-                                    {needsFito && (
-                                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.58rem] font-black whitespace-nowrap" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
-                                        ⚠ Fito
-                                      </span>
-                                    )}
-                                    {asig && (
-                                      <button
-                                        onClick={() => setLotesAsignados(prev => prev.filter(a => a.loteFinalId !== lote.id))}
-                                        className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:opacity-90 shrink-0"
-                                        style={{ backgroundColor: '#FF0059' }}
-                                        title="Quitar asignación"
-                                      >
-                                        <Trash2 size={11} className="text-white" />
-                                      </button>
-                                    )}
-                                  </div>
+                                  {asig && (
+                                    <button
+                                      onClick={() => setLotesAsignados(prev => prev.filter(a => a.loteFinalId !== lote.id))}
+                                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:opacity-90 shrink-0"
+                                      style={{ backgroundColor: '#FF0059' }}
+                                      title="Quitar asignación"
+                                    >
+                                      <Trash2 size={11} className="text-white" />
+                                    </button>
+                                  )}
                                 </td>
                               </tr>
                             );
                           })}
-                        {lotesDisponibles.length === 0 && !loadingLotes && lotesAsignados.filter(a => a.esManual).length === 0 && (
-                          <tr>
-                            <td colSpan={8} className="px-3 py-10 text-center text-xs text-gray-400">
-                              {orden.campana ? 'No hay lotes trillados para esta campaña' : 'Sin campaña asignada a la orden'}
-                            </td>
-                          </tr>
-                        )}
                         {lotesAsignados.filter(a => a.esManual).map(item => (
                           <tr key={item.loteFinalId} className="border-t" style={{ borderColor: '#E8F3E8', backgroundColor: '#FFFDF5', borderLeft: '3px solid #D97706' }}>
                             <td className="px-3 py-2">
                               <input
                                 value={item.codigo}
                                 onChange={e => setLotesAsignados(prev => prev.map(a => a.loteFinalId === item.loteFinalId ? { ...a, codigo: e.target.value } : a))}
-                                placeholder="Código"
-                                className="w-28 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-yellow-500 bg-white"
+                                placeholder="OTR-001"
+                                className="w-24 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-yellow-500 bg-white font-mono"
                                 style={{ borderColor: '#D97706' }}
                               />
                             </td>
                             <td className="px-3 py-2" colSpan={2}>
-                              <input
+                              <select
                                 value={item.descripcion ?? ''}
                                 onChange={e => setLotesAsignados(prev => prev.map(a => a.loteFinalId === item.loteFinalId ? { ...a, descripcion: e.target.value } : a))}
-                                placeholder="Descripción / producto"
                                 className="w-full border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-yellow-500 bg-white"
                                 style={{ borderColor: '#D97706' }}
-                              />
+                              >
+                                <option value="">Seleccionar producto…</option>
+                                {skusOtros.map(s => (
+                                  <option key={s.id} value={s.nombre}>{s.codigo ? `${s.codigo} · ` : ''}{s.nombre}</option>
+                                ))}
+                              </select>
                             </td>
                             <td className="px-3 py-2.5 text-[0.6rem] text-gray-400 italic">manual</td>
                             <td className="px-3 py-2">
                               <input
-                                type="number" min={0}
-                                value={item.cantidadKg ?? ''}
-                                placeholder="0"
+                                type="number" min={0} value={item.cantidadKg ?? ''} placeholder="0"
                                 onChange={e => {
                                   const val = e.target.value === '' ? null : Number(e.target.value);
                                   setLotesAsignados(prev => prev.map(a => a.loteFinalId === item.loteFinalId ? { ...a, cantidadKg: val } : a));
@@ -569,9 +722,7 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
                             </td>
                             <td className="px-3 py-2">
                               <input
-                                type="number" min={0}
-                                value={item.nroSacos ?? ''}
-                                placeholder="0"
+                                type="number" min={0} value={item.nroSacos ?? ''} placeholder="0"
                                 onChange={e => {
                                   const val = e.target.value === '' ? null : Number(e.target.value);
                                   setLotesAsignados(prev => prev.map(a => a.loteFinalId === item.loteFinalId ? { ...a, nroSacos: val } : a));
@@ -582,15 +733,28 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
                             </td>
                             <td className="px-3 py-2">
                               <input
-                                type="date"
-                                value={item.fechaProceso ?? ''}
+                                type="number" min={0} value={item.paleta ?? ''} placeholder="0"
                                 onChange={e => {
-                                  const val = e.target.value || null;
-                                  setLotesAsignados(prev => prev.map(a => a.loteFinalId === item.loteFinalId ? { ...a, fechaProceso: val } : a));
+                                  const val = e.target.value === '' ? null : Number(e.target.value);
+                                  setLotesAsignados(prev => prev.map(a => a.loteFinalId === item.loteFinalId ? { ...a, paleta: val } : a));
                                 }}
-                                className="border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-yellow-500 bg-white"
+                                className="w-16 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-yellow-500 bg-white"
                                 style={{ borderColor: '#D97706' }}
                               />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number" min={0} step="0.01" value={item.precio ?? ''} placeholder="0.00"
+                                onChange={e => {
+                                  const val = e.target.value === '' ? null : Number(e.target.value);
+                                  setLotesAsignados(prev => prev.map(a => a.loteFinalId === item.loteFinalId ? { ...a, precio: val } : a));
+                                }}
+                                className="w-24 border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-yellow-500 bg-white"
+                                style={{ borderColor: '#D97706' }}
+                              />
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              <span className="px-2 py-0.5 rounded-full text-[0.58rem] font-black bg-gray-100 text-gray-500">—</span>
                             </td>
                             <td className="px-3 py-2">
                               <button
@@ -638,7 +802,16 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   {fieldLabel('Nombre de planta / Almacén')}
-                  <input value={planta} onChange={e => setPlanta(e.target.value)} className={INP} style={inpStyle} placeholder="Planta Lima Norte…" />
+                  <div className="relative">
+                    <select value={planta} onChange={e => { setPlanta(e.target.value); if (e.target.value !== 'Otro') setPlantaCustom(''); }} className={`${INP} pr-9 appearance-none`} style={inpStyle}>
+                      <option value="">Seleccionar planta…</option>
+                      {PLANTAS.map(p => <option key={p}>{p}</option>)}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                  {planta === 'Otro' && (
+                    <input value={plantaCustom} onChange={e => setPlantaCustom(e.target.value)} className={`${INP} mt-2`} style={inpStyle} placeholder="Nombre de la planta…" />
+                  )}
                 </div>
                 <div>
                   {fieldLabel('Fecha de alistado')}
@@ -660,23 +833,21 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
                 </div>
                 <div>
                   {fieldLabel('Tipo de empaque')}
-                  <input value={tipoEmpaque} onChange={e => setTipoEmpaque(e.target.value)} className={INP} style={inpStyle} placeholder="Sacos yute 69 kg, GrainPro…" />
+                  <div className="relative">
+                    <select value={tipoEmpaque} onChange={e => setTipoEmpaque(e.target.value)} className={`${INP} pr-9 appearance-none`} style={inpStyle}>
+                      <option value="">Seleccionar…</option>
+                      {TIPOS_EMPAQUE.map(t => <option key={t}>{t}</option>)}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
                 </div>
                 <div>
                   {fieldLabel('Empresa de transporte / Traslado')}
                   <input value={transporte} onChange={e => setTransporte(e.target.value)} className={INP} style={inpStyle} placeholder="Transportes XYZ S.A.C…" />
                 </div>
-                <div className="flex flex-col justify-center gap-3 pt-1">
-                  {([
-                    ['SEPARAR ALISTADO Y DESPACHO', separarAlistado, setSepararAlistado],
-                    ['PLAN DE ALISTADO ANTES DEL DESPACHO', planAlistado, setPlanAlistado],
-                    ['COSTO DE VIÁTICOS', costViaticos, setCostViaticos],
-                  ] as [string, boolean, React.Dispatch<React.SetStateAction<boolean>>][]).map(([label, checked, set]) => (
-                    <label key={label} className="flex items-start gap-2.5 cursor-pointer select-none">
-                      <CheckboxUI checked={checked} onChange={() => set(v => !v)} />
-                      <span className="text-[0.65rem] font-bold uppercase tracking-wide leading-tight" style={{ color: checked ? CP : '#6B7280' }}>{label}</span>
-                    </label>
-                  ))}
+                <div>
+                  {fieldLabel('Costos de viáticos (USD)')}
+                  <input type="number" min={0} step="0.01" value={costosViaticos} onChange={e => setCostosViaticos(e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
                 </div>
               </div>
               <div>
@@ -700,6 +871,100 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
                     <p className="font-black text-sm" style={{ color: CP }}>S/ {totalCostos.toLocaleString('es-PE', { minimumFractionDigits: 2 })}</p>
                   </div>
                 )}
+              </div>
+
+              {/* DESPACHOS */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[0.65rem] font-black uppercase tracking-widest" style={{ color: TX }}>Despachos</p>
+                  <button
+                    onClick={() => setDespachos(prev => [...prev, {
+                      id: `dep-${Date.now()}`,
+                      fechaDespacho: '', fechaRecepcion: '',
+                      origen: '', destino: '',
+                      empresaTransporte: '',
+                      costoTransporte: '', costoEstiba: '', costoViaticos: '',
+                      responsable: '', kilosDepachados: '',
+                    }])}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[0.65rem] font-black uppercase tracking-wide text-white transition-all hover:opacity-90"
+                    style={{ backgroundColor: CP }}
+                  >
+                    <Plus size={11} />Agregar despacho
+                  </button>
+                </div>
+                {despachos.length === 0 && (
+                  <div className="flex items-center justify-center gap-2 py-8 rounded-xl border border-dashed text-gray-400 text-xs" style={{ borderColor: BD }}>
+                    <Truck size={15} className="opacity-40" />
+                    Sin despachos registrados. Haz clic en "Agregar despacho" para añadir.
+                  </div>
+                )}
+                <div className="space-y-3">
+                  {despachos.map((d, idx) => {
+                    const upd = (field: keyof DespachoItem, val: string) =>
+                      setDespachos(prev => prev.map(x => x.id === d.id ? { ...x, [field]: val } : x));
+                    return (
+                      <div key={d.id} className="rounded-2xl border overflow-hidden" style={{ borderColor: BD }}>
+                        <div className="flex items-center justify-between px-4 py-2.5" style={{ backgroundColor: CP }}>
+                          <span className="text-xs font-black text-white uppercase tracking-wide">Despacho #{idx + 1}</span>
+                          <button
+                            onClick={() => setDespachos(prev => prev.filter(x => x.id !== d.id))}
+                            className="text-white/60 hover:text-white transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
+                          <div>
+                            {fieldLabel('Fecha de despacho')}
+                            <div className="relative">
+                              <input type="date" value={d.fechaDespacho} onChange={e => upd('fechaDespacho', e.target.value)} className={INP} style={inpStyle} />
+                              <Calendar size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                            </div>
+                          </div>
+                          <div>
+                            {fieldLabel('Fecha de recepción')}
+                            <div className="relative">
+                              <input type="date" value={d.fechaRecepcion} onChange={e => upd('fechaRecepcion', e.target.value)} className={INP} style={inpStyle} />
+                              <Calendar size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                            </div>
+                          </div>
+                          <div>
+                            {fieldLabel('Kilos despachados')}
+                            <input type="number" min={0} value={d.kilosDepachados} onChange={e => upd('kilosDepachados', e.target.value)} className={INP} style={inpStyle} placeholder="0" />
+                          </div>
+                          <div>
+                            {fieldLabel('Origen')}
+                            <input value={d.origen} onChange={e => upd('origen', e.target.value)} className={INP} style={inpStyle} placeholder="Ciudad / Almacén origen" />
+                          </div>
+                          <div>
+                            {fieldLabel('Destino')}
+                            <input value={d.destino} onChange={e => upd('destino', e.target.value)} className={INP} style={inpStyle} placeholder="Ciudad / Puerto destino" />
+                          </div>
+                          <div>
+                            {fieldLabel('Empresa de transporte')}
+                            <input value={d.empresaTransporte} onChange={e => upd('empresaTransporte', e.target.value)} className={INP} style={inpStyle} placeholder="Transportes XYZ…" />
+                          </div>
+                          <div>
+                            {fieldLabel('Costo de transporte (USD)')}
+                            <input type="number" min={0} step="0.01" value={d.costoTransporte} onChange={e => upd('costoTransporte', e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+                          </div>
+                          <div>
+                            {fieldLabel('Costo de estiba (USD)')}
+                            <input type="number" min={0} step="0.01" value={d.costoEstiba} onChange={e => upd('costoEstiba', e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+                          </div>
+                          <div>
+                            {fieldLabel('Costo de viáticos (USD)')}
+                            <input type="number" min={0} step="0.01" value={d.costoViaticos} onChange={e => upd('costoViaticos', e.target.value)} className={INP} style={inpStyle} placeholder="0.00" />
+                          </div>
+                          <div className="col-span-2 sm:col-span-3">
+                            {fieldLabel('Responsable de despacho')}
+                            <input value={d.responsable} onChange={e => upd('responsable', e.target.value)} className={INP} style={inpStyle} placeholder="Nombre del responsable" />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

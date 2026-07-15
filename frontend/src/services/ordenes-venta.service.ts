@@ -164,7 +164,7 @@ export const ordenesVentaService = {
 
   async uploadExportacionFile(
     id: number,
-    tipo: 'documentos' | 'reportes',
+    tipo: string,
     file: File,
   ): Promise<{ name: string; file: string }[]> {
     const form = new FormData();
@@ -175,7 +175,7 @@ export const ordenesVentaService = {
 
   async deleteExportacionFile(
     id: number,
-    tipo: 'documentos' | 'reportes',
+    tipo: string,
     filename: string,
   ): Promise<{ name: string; file: string }[]> {
     const r = await api.delete(`/ordenes-venta/${id}/exportacion/upload/${tipo}/${filename}`);
@@ -189,6 +189,18 @@ export const ordenesVentaService = {
 
   async upsertPostVenta(id: number, dto: Record<string, unknown>): Promise<any> {
     const r = await api.put(`/ordenes-venta/${id}/post-venta`, dto);
+    return unwrap(r);
+  },
+
+  async uploadPostVentaFile(id: number, tipo: string, file: File): Promise<{ name: string; file: string }[]> {
+    const form = new FormData();
+    form.append('file', file);
+    const r = await api.post(`/ordenes-venta/${id}/post-venta/upload/${tipo}`, form);
+    return unwrap(r);
+  },
+
+  async deletePostVentaFile(id: number, tipo: string, filename: string): Promise<{ name: string; file: string }[]> {
+    const r = await api.delete(`/ordenes-venta/${id}/post-venta/upload/${tipo}/${filename}`);
     return unwrap(r);
   },
 

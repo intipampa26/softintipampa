@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { ILike, IsNull, Repository } from 'typeorm';
 import * as XLSX from 'xlsx';
-import { Muestra } from './muestra.entity';
+import { Muestra, TipoMuestraProducto } from './muestra.entity';
 import { EvaluacionFisica } from './evaluacion-fisica.entity';
 import { EvaluacionSensorial } from './evaluacion-sensorial.entity';
 import { CreateMuestraDto } from './dto/create-muestra.dto';
@@ -70,6 +70,8 @@ export class MuestrasService {
     if (filter.loteId)     where['loteId']     = filter.loteId;
     if (filter.tipoMuestra) where['tipoMuestra'] = filter.tipoMuestra;
     if (filter.estado)      where['estado']      = filter.estado;
+    if (filter.resultado)   where['resultado']   = filter.resultado;
+    if (filter.sinLote)     where['loteId']      = IsNull();
     if (filter.search?.trim())   where['codigo']   = ILike(`%${filter.search.trim()}%`);
     if (filter.variedad?.trim()) where['variedad'] = ILike(`%${filter.variedad.trim()}%`);
 
@@ -454,7 +456,9 @@ export class MuestrasService {
           productorId,
           campanaId,
           fechaRegistro: row['Fecha']       ? String(row['Fecha'])       : null,
-          tipoMuestra:   row['TipoMuestra'] ? String(row['TipoMuestra']) : null,
+          tipoMuestra:   (Object.values(TipoMuestraProducto) as string[]).includes(String(row['TipoMuestra'] ?? '').toLowerCase())
+                           ? String(row['TipoMuestra']).toLowerCase() as TipoMuestraProducto
+                           : null,
           observaciones: row['Observaciones'] ? String(row['Observaciones']) : null,
         };
 

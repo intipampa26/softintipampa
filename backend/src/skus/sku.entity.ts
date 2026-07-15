@@ -35,6 +35,9 @@ export class Sku {
   @Column({ length: 100, nullable: true })
   nombreFDA: string | null;
 
+  @Column({ default: false })
+  soloOtros: boolean;
+
   @Column({ default: true })
   activo: boolean;
 

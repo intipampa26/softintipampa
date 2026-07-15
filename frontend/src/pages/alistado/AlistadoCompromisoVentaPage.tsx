@@ -65,7 +65,10 @@ export function AlistadoCompromisoVentaPage() {
               </div>
             )}
             {field('Comprador / Cliente',
-              <input value={comprador} onChange={e => setComprador(e.target.value)} className={INP} style={inpStyle} placeholder="Razón social del comprador…" />
+              <div className="flex items-center gap-2 border rounded-xl px-3 py-2.5 bg-gray-50" style={{ borderColor: '#D9DDD8' }}>
+                <span className="flex-1 text-sm font-semibold truncate" style={{ color: '#2C2C2C' }}>{comprador || '—'}</span>
+                <span className="text-[0.6rem] font-bold px-1.5 py-0.5 rounded" style={{ background: '#D1FAE5', color: '#065F46' }}>bloqueado</span>
+              </div>
             )}
             {field(`Precio acordado (${moneda} / kg)`,
               <div className="flex gap-2">

@@ -6,13 +6,16 @@ export interface Sku {
   nombre: string;
   unidad: string | null;
   descripcion: string | null;
+  soloOtros: boolean;
   activo: boolean;
 }
 
 class SkusService {
-  async findAll(): Promise<Sku[]> {
+  async findAll(params?: { soloOtros?: boolean }): Promise<Sku[]> {
     try {
-      const { data } = await api.get('/skus');
+      const query: Record<string, string> = {};
+      if (params?.soloOtros !== undefined) query.soloOtros = String(params.soloOtros);
+      const { data } = await api.get('/skus', { params: query });
       return Array.isArray(data) ? data : [];
     } catch {
       return [];

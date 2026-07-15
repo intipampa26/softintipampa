@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Send, FileText, Calendar, ChevronDown, Search } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Send, FileText, Calendar, ChevronDown, Search, Loader2 } from 'lucide-react';
 import LoadingLogo from './LoadingLogo';
 import { ModalLoadingOverlay } from '@/components/ui/ModalLoadingOverlay';
 import { useToast } from '@/contexts/ToastContext';
@@ -7,6 +7,7 @@ import { ordenesVentaService } from '../services/ordenes-venta.service';
 import { clientesService, Cliente } from '@/services/clientes.service';
 import { campanasService } from '@/services/campanas.service';
 import { muestrasService } from '@/services/muestras.service';
+import { productoresService } from '@/services/productores.service';
 
 const CP = '#445D46';
 const BD = '#D9DDD8';
@@ -38,15 +39,18 @@ const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 interface MuestraRow {
-  id:         number;
-  codigo:     string;
-  lote:       string;
-  campana:    string;
-  productor:  string;
+  id:          number;
+  codigo:      string;
+  lote:        string;
+  campana:     string;
+  productor:   string;
   tipoMuestra: string;
-  fecha:      string;
-  cantidad:   string;
-  costos:     string;
+  variedad:    string;
+  fecha:       string;
+  fechaEnvio:  string;
+  cantidad:    string;
+  costos:      string;
+  comentario:  string;
 }
 
 export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props) {
@@ -61,10 +65,18 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
   const [clienteNombre,  setClienteNombre]  = useState(orden.cliente ?? '');
   const [courier,        setCourier]        = useState('');
   const [costoCourier,   setCostoCourier]   = useState('');
-  const [fitosanitario,  setFitosanitario]  = useState<'si' | 'no' | ''>('');
-  const [busqueda,       setBusqueda]       = useState('');
-  const [muestras,       setMuestras]       = useState<MuestraRow[]>([]);
-  const [clientes,       setClientes]       = useState<Cliente[]>([]);
+  const [fitosanitario,    setFitosanitario]    = useState<'si' | 'no' | ''>('');
+  const [busqueda,         setBusqueda]         = useState('');
+  const [filterProductor,  setFilterProductor]  = useState('');
+  const [muestras,         setMuestras]         = useState<MuestraRow[]>([]);
+  const [historialMuestras,setHistorialMuestras]= useState<MuestraRow[]>([]);
+  const [buscando,         setBuscando]         = useState(false);
+  const [clientes,         setClientes]         = useState<Cliente[]>([]);
+  const [productores,      setProductores]      = useState<{ id: number; nombre: string }[]>([]);
+  const [campanaIdCargado, setCampanaIdCargado] = useState<number | null>(null);
+  const detallesRef    = useRef<any[]>([]);
+  const productoresRef = useRef<{ id: number; nombre: string }[]>([]);
+  const debounceRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [nroCotizacion, setNroCotizacion] = useState('');
   const [fechaCotiz,    setFechaCotiz]    = useState('');
@@ -82,10 +94,39 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
     clientesService.getPage(1, 200).then(r => setClientes(r.data)).catch(() => {});
   }, []);
 
+  // Sincroniza RUC cuando cargan los clientes o cambia el nombre seleccionado
+  useEffect(() => {
+    if (!clientes.length || !clienteNombre) return;
+    const c = clientes.find(c => c.nombre === clienteNombre);
+    if (c?.nroDocumento) setRucDni(c.nroDocumento);
+  }, [clientes, clienteNombre]);
+
   function handleClienteChange(nombre: string) {
     setClienteNombre(nombre);
     const c = clientes.find(c => c.nombre === nombre);
     setRucDni(c?.nroDocumento ?? '');
+  }
+
+  function mapMuestrasData(raw: any[], fechaEnvioOverride?: string): MuestraRow[] {
+    return raw.map((m: any) => {
+      const det = detallesRef.current.find((d: any) => d.muestraId === m.id);
+      return {
+        id:          m.id,
+        codigo:      m.codigo ?? '',
+        lote:        m.loteFinal?.codigo ?? m.lote?.codigo ?? '',
+        campana:     m.campana?.nombre ?? '',
+        productor:   m.productor
+          ? `${m.productor.nombre}${m.productor.apellido ? ' ' + m.productor.apellido : ''}`.trim()
+          : '',
+        tipoMuestra: m.tipoMuestra ?? '',
+        variedad:    m.variedad ?? '',
+        fecha:       m.fecha ?? '',
+        fechaEnvio:  fechaEnvioOverride ?? '',
+        cantidad:    det?.cantidad   != null ? String(det.cantidad)   : '',
+        costos:      det?.costos     != null ? String(det.costos)     : '',
+        comentario:  det?.comentario != null ? String(det.comentario) : '',
+      };
+    });
   }
 
   useEffect(() => {
@@ -95,60 +136,87 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
       ordenesVentaService.getCotizacion(orden.dbId),
       campanasService.getPage(1, 200),
     ]).then(async ([pv, cot, campanasData]) => {
-      if (pv.preventa) {
-        const p = pv.preventa;
-        if (p.fechaEnvio)     setFechaEnvio(p.fechaEnvio);
-        if (p.fechaRecepcion) setFechaRecepcion(p.fechaRecepcion);
-        if (p.rucDni)         setRucDni(p.rucDni);
-        if (p.clienteNombre)  setClienteNombre(p.clienteNombre);
-        if (p.courier)        setCourier(p.courier);
-        if (p.costoCourier != null) setCostoCourier(String(p.costoCourier));
-        if (p.fitosanitario)  setFitosanitario(p.fitosanitario as 'si' | 'no');
-      }
       if (cot) {
-        if (cot.nroCotizacion)   setNroCotizacion(cot.nroCotizacion);
-        if (cot.fechaCotizacion) setFechaCotiz(cot.fechaCotizacion);
-        if (cot.precioUsd != null) setPrecioUsd(String(cot.precioUsd));
-        if (cot.moneda)          setMoneda(cot.moneda as 'USD' | 'PEN');
-        if (cot.pesoKg    != null) setPesoKg(String(cot.pesoKg));
-        if (cot.incoterm)        setIncoterm(cot.incoterm);
-        if (cot.puerto)          setPuerto(cot.puerto);
-        if (cot.condicionesPago) setCondPago(cot.condicionesPago);
-        if (cot.validezDias != null) setValidez(String(cot.validezDias));
-        if (cot.observaciones)   setObservaciones(cot.observaciones);
+        if (cot.nroCotizacion)        setNroCotizacion(cot.nroCotizacion);
+        if (cot.fechaCotizacion)      setFechaCotiz(cot.fechaCotizacion);
+        if (cot.precioUsd   != null)  setPrecioUsd(String(cot.precioUsd));
+        if (cot.moneda)               setMoneda(cot.moneda as 'USD' | 'PEN');
+        if (cot.pesoKg      != null)  setPesoKg(String(cot.pesoKg));
+        if (cot.incoterm)             setIncoterm(cot.incoterm);
+        if (cot.puerto)               setPuerto(cot.puerto);
+        if (cot.condicionesPago)      setCondPago(cot.condicionesPago);
+        if (cot.validezDias != null)  setValidez(String(cot.validezDias));
+        if (cot.observaciones)        setObservaciones(cot.observaciones);
       }
+
+      detallesRef.current = pv.preventa?.muestrasDetalle ?? [];
+
       const campanaObj = campanasData.data.find(c => c.nombre === orden.campana);
       if (campanaObj) {
-        const muestrasData = await muestrasService.getPage({ campanaId: campanaObj.id, limit: 500 });
-        const detalles: { muestraId: number; cantidad: number | null; costos: number | null }[] =
-          pv.preventa?.muestrasDetalle ?? [];
-        setMuestras(muestrasData.data.map((m: any) => {
-          const det = detalles.find(d => d.muestraId === m.id);
-          return {
-            id:          m.id,
-            codigo:      m.codigo ?? '',
-            lote:        m.loteFinal?.codigo ?? m.lote?.codigo ?? '',
-            campana:     m.campana?.nombre ?? '',
-            productor:   m.productor
-              ? `${m.productor.nombre}${m.productor.apellido ? ' ' + m.productor.apellido : ''}`.trim()
-              : '',
-            tipoMuestra: m.tipoMuestra ?? '',
-            fecha:       m.fecha ?? '',
-            cantidad:    det?.cantidad != null ? String(det.cantidad) : '',
-            costos:      det?.costos   != null ? String(det.costos)   : '',
-          };
-        }));
+        setCampanaIdCargado(campanaObj.id);
+
+        // Cargar productores para el dropdown
+        productoresService.getPage(1, 500, campanaObj.id)
+          .then(r => {
+            const list = r.data.map((p: any) => ({
+              id:     p.id,
+              nombre: `${p.nombre}${p.apellido ? ' ' + p.apellido : ''}`.trim(),
+            }));
+            setProductores(list);
+            productoresRef.current = list;
+          })
+          .catch(() => {});
+
+        // Si hay envíos guardados, cargarlos para el historial automáticamente
+        if (detallesRef.current.length > 0) {
+          const fechaEnvioGuardada = pv.preventa?.fechaEnvio ?? '';
+          muestrasService.getPage({ campanaId: campanaObj.id, limit: 500 })
+            .then(res => {
+              const rows = mapMuestrasData(res.data, fechaEnvioGuardada)
+                .filter(m => m.cantidad || m.costos || m.comentario);
+              setHistorialMuestras(rows);
+            })
+            .catch(() => {});
+        }
+
       }
     }).finally(() => setLoading(false));
   }, [orden.dbId, orden.campana]);
 
-  const updateMuestra = (id: number, field: 'cantidad' | 'costos', value: string) =>
+  // Debounce 5s: buscar en DB solo cuando hay algo en los filtros
+  useEffect(() => {
+    if (!campanaIdCargado) return;
+    if (!busqueda && !filterProductor) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setBuscando(true);
+      try {
+        const prodId = productoresRef.current.find(p => p.nombre === filterProductor)?.id;
+        const result = await muestrasService.getPage({
+          campanaId:   campanaIdCargado,
+          search:      busqueda || undefined,
+          productorId: prodId,
+          limit:       100,
+        });
+        setMuestras(mapMuestrasData(result.data));
+      } catch { /* silencioso */ }
+      finally { setBuscando(false); }
+    }, 5000);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [busqueda, filterProductor, campanaIdCargado]);
+
+  const updateMuestra = (id: number, field: 'cantidad' | 'costos' | 'comentario', value: string) =>
     setMuestras(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
 
-  const filtradas = muestras.filter(m => {
-    const q = busqueda.toLowerCase();
-    return !q || [m.codigo, m.lote, m.productor, m.tipoMuestra].some(v => v.toLowerCase().includes(q));
-  });
+  const filtradas = muestras;
+
+  // Historial: unión de los guardados al abrir + los modificados en la búsqueda actual
+  const historialBusqueda = muestras.filter(m => m.cantidad || m.costos || m.comentario);
+  const historialIds = new Set(historialBusqueda.map(m => m.id));
+  const historial = [
+    ...historialBusqueda,
+    ...historialMuestras.filter(m => !historialIds.has(m.id)),
+  ];
 
   const total = precioUsd && pesoKg ? parseFloat(precioUsd) * parseFloat(pesoKg) : 0;
   const monedaSymbol = moneda === 'PEN' ? 'S/.' : 'USD';
@@ -165,14 +233,41 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
           courier:        courier        || undefined,
           costoCourier:   costoCourier   ? Number(costoCourier) : undefined,
           fitosanitario:  fitosanitario  || undefined,
-          muestrasDetalle: muestras
-            .filter(m => m.cantidad || m.costos)
-            .map(m => ({
-              muestraId: m.id,
-              cantidad:  m.cantidad ? Number(m.cantidad) : null,
-              costos:    m.costos   ? Number(m.costos)   : null,
-            })),
+          muestrasDetalle: (() => {
+            const nuevos = muestras
+              .filter(m => m.cantidad || m.costos || m.comentario)
+              .map(m => ({
+                muestraId:  m.id,
+                cantidad:   m.cantidad  ? Number(m.cantidad) : null,
+                costos:     m.costos    ? Number(m.costos)   : null,
+                comentario: m.comentario || null,
+              }));
+            // merge with existing saved detalles not in current results
+            const visiblesIds = new Set(muestras.map(m => m.id));
+            const previos = detallesRef.current.filter((d: any) => !visiblesIds.has(d.muestraId));
+            detallesRef.current = [...previos, ...nuevos];
+            return detallesRef.current;
+          })(),
         });
+        // Actualizar historial con los guardados en esta sesión (con la fecha de envío actual)
+        const guardados = muestras
+          .filter(m => m.cantidad || m.costos || m.comentario)
+          .map(m => ({ ...m, fechaEnvio: fechaEnvio || m.fechaEnvio }));
+        setHistorialMuestras(prev => {
+          const ids = new Set(guardados.map(m => m.id));
+          return [...guardados, ...prev.filter(m => !ids.has(m.id))];
+        });
+        // Limpiar campos del formulario
+        setFechaEnvio('');
+        setFechaRecepcion('');
+        setRucDni('');
+        setClienteNombre('');
+        setCourier('');
+        setCostoCourier('');
+        setFitosanitario('');
+        setMuestras([]);
+        setBusqueda('');
+        setFilterProductor('');
       } else {
         await ordenesVentaService.upsertCotizacion(orden.dbId, {
           fechaCotizacion: fechaCotiz    || undefined,
@@ -305,19 +400,35 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
                 </div>
               </div>
 
-              <div className="relative">
-                <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar muestra…" className={INP} style={inpStyle} />
-                <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <select value={filterProductor} onChange={e => setFilterProductor(e.target.value)} className={`${INP} pr-9 appearance-none`} style={inpStyle}>
+                    <option value="">Todos los productores</option>
+                    {productores.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                  </select>
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+                <div className="relative flex-1">
+                  <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar muestra…" className={INP} style={inpStyle} />
+                  <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
               </div>
 
-              {muestras.length === 0 ? (
-                <p className="text-center text-xs text-gray-400 py-6">No hay muestras vinculadas al lote <strong>{orden.lote}</strong></p>
+              {buscando ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-gray-400">
+                  <Loader2 size={15} className="animate-spin" style={{ color: CP }} />
+                  <span className="text-xs">Buscando muestras…</span>
+                </div>
+              ) : muestras.length === 0 ? (
+                <p className="text-center text-xs text-gray-400 py-6">
+                  {(busqueda || filterProductor) ? 'Sin resultados para los filtros aplicados' : 'Usa los filtros de arriba para buscar muestras (búsqueda automática en 5 seg)'}
+                </p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border" style={{ borderColor: BD }}>
                   <table className="w-full text-xs border-collapse min-w-[700px]">
                     <thead>
                       <tr style={{ backgroundColor: BG }}>
-                        {['CÓDIGO','LOTE','CAMPAÑA','PRODUCTOR','CANTIDAD (kg)','FECHA','COSTO'].map(h => (
+                        {['CÓDIGO','CAMPAÑA','PRODUCTOR','VARIEDAD','CANTIDAD (kg)','COMENTARIO'].map(h => (
                           <th key={h} className="text-[0.6rem] font-black uppercase tracking-wide text-center py-2.5 px-3" style={{ color: CP, borderBottom: `2px solid ${BD}` }}>{h}</th>
                         ))}
                       </tr>
@@ -326,23 +437,51 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
                       {filtradas.map((m, i) => (
                         <tr key={m.id} style={{ backgroundColor: i % 2 === 0 ? '#fff' : BG }}>
                           <td className="py-2 px-3 text-center font-mono font-semibold" style={{ color: CP }}>{m.codigo}</td>
-                          <td className="py-2 px-3 text-center" style={{ color: TX }}>{m.lote}</td>
                           <td className="py-2 px-3 text-center text-gray-500">{m.campana}</td>
                           <td className="py-2 px-3 text-center" style={{ color: TX }}>{m.productor}</td>
+                          <td className="py-2 px-3 text-center text-gray-500">{m.variedad || '—'}</td>
                           <td className="py-2 px-3 text-center">
                             <input type="number" value={m.cantidad} onChange={e => updateMuestra(m.id,'cantidad',e.target.value)} className="w-20 border rounded-full px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-green-500" style={{ borderColor: BD }} placeholder="0 kg" />
                           </td>
-                          <td className="py-2 px-3 text-center text-gray-400">{m.fecha}</td>
-                          <td className="py-2 px-3 text-center">
-                            <input type="number" value={m.costos} onChange={e => updateMuestra(m.id,'costos',e.target.value)} className="w-20 border rounded-full px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-green-500" style={{ borderColor: BD }} placeholder="$ 0" />
+                          <td className="py-2 px-3">
+                            <input type="text" value={m.comentario} onChange={e => updateMuestra(m.id,'comentario',e.target.value)} className="w-full border rounded-full px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-500" style={{ borderColor: BD }} placeholder="Comentario del cliente…" />
                           </td>
                         </tr>
                       ))}
                       {filtradas.length === 0 && (
-                        <tr><td colSpan={7} className="py-6 text-center text-xs text-gray-400">Sin resultados para "{busqueda}"</td></tr>
+                        <tr><td colSpan={6} className="py-6 text-center text-xs text-gray-400">Sin resultados</td></tr>
                       )}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {historial.length > 0 && (
+                <div>
+                  <p className="text-[0.65rem] font-black uppercase tracking-wide mb-2" style={{ color: TX, opacity: 0.55 }}>Historial de envíos</p>
+                  <div className="overflow-x-auto rounded-xl border" style={{ borderColor: BD }}>
+                    <table className="w-full text-xs border-collapse min-w-[600px]">
+                      <thead>
+                        <tr style={{ backgroundColor: BG }}>
+                          {['CÓDIGO','FECHA','PRODUCTOR','VARIEDAD','CANTIDAD (kg)','COMENTARIO CLIENTE'].map(h => (
+                            <th key={h} className="text-[0.6rem] font-black uppercase tracking-wide text-center py-2.5 px-3" style={{ color: CP, borderBottom: `2px solid ${BD}` }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historial.map((m, i) => (
+                          <tr key={m.id} style={{ backgroundColor: i % 2 === 0 ? '#fff' : BG }}>
+                            <td className="py-2 px-3 text-center font-mono font-semibold" style={{ color: CP }}>{m.codigo}</td>
+                            <td className="py-2 px-3 text-center text-gray-500">{m.fechaEnvio || m.fecha || '—'}</td>
+                            <td className="py-2 px-3 text-center" style={{ color: TX }}>{m.productor}</td>
+                            <td className="py-2 px-3 text-center text-gray-500">{m.variedad || '—'}</td>
+                            <td className="py-2 px-3 text-center font-semibold" style={{ color: CP }}>{m.cantidad} kg</td>
+                            <td className="py-2 px-3 text-center text-gray-500">{m.comentario || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -357,7 +496,7 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
                   </div>
                 </div>
                 <div>
-                  {fieldLabel(`Precio (${moneda} / kg)`)}
+                  {fieldLabel('Total de venta')}
                   <div className="flex gap-2">
                     <div className="flex rounded-xl overflow-hidden border shrink-0" style={{ borderColor: BD }}>
                       {(['USD', 'PEN'] as const).map(m => (
@@ -408,8 +547,8 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
                   </div>
                 </div>
                 <div>
-                  {fieldLabel('Validez de la oferta (días)')}
-                  <input type="number" min={1} value={validez} onChange={e => setValidez(e.target.value)} className={INP} style={inpStyle} placeholder="15" />
+                  {fieldLabel('Mes de exportación (est.)')}
+                  <input type="month" value={validez} onChange={e => setValidez(e.target.value)} className={INP} style={inpStyle} />
                 </div>
               </div>
 

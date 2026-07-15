@@ -201,6 +201,98 @@ export class OrdenExportacion {
   @Column({ type: 'text', nullable: true })
   observPlan: string | null;
 
+  // ── Plan de Exportación ───────────────────────────────────────────────────────
+  @Column({ type: 'date', nullable: true })
+  fechaCutoff: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  fechaFitosanitario: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  fechaEntregaCarga: string | null;
+
+  @Column({ length: 200, nullable: true })
+  agenteAduanasPlan: string | null;
+
+  @Column({ length: 200, nullable: true })
+  agenteCarga: string | null;
+
+  @Column({ type: 'decimal', precision: 14, scale: 2, nullable: true })
+  valorProductos: number | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  pesoTotalPlan: number | null;
+
+  @Column({ length: 150, nullable: true })
+  puertoExportacion: string | null;
+
+  @Column({ default: false })
+  fullContainer: boolean;
+
+  @Column({ type: 'int', nullable: true })
+  cantidadPaletasPlan: number | null;
+
+  @Column({ default: false })
+  deshumedecedores: boolean;
+
+  @Column({ default: false })
+  controlTemperatura: boolean;
+
+  @Column({ length: 200, nullable: true })
+  numBooking: string | null;
+
+  // ── Despacho Aduanero ─────────────────────────────────────────────────────────
+  @Column({ type: 'date', nullable: true })
+  fechaIngresoCarga: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  fechaSenasa: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  cantidadPalletsDesp: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  cantidadPaquetes: number | null;
+
+  // ── Cierre de Exportación ─────────────────────────────────────────────────────
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  costoTransporteAlmacen: number | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  costoComisionAgente: number | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  costoAlmacenPortuario: number | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  costoFlete: number | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  costoSeguro: number | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  pesoTotalCierre: number | null;
+
+  @Column({ length: 100, nullable: true })
+  nroCertFito: string | null;
+
+  @Column({ length: 100, nullable: true })
+  nroCertOrigen: string | null;
+
+  @Column({ length: 200, nullable: true })
+  guiaRemisionCierre: string | null;
+
+  @Column({ length: 200, nullable: true })
+  facturaSupanat: string | null;
+
+  // ── File map (dynamic categories) ────────────────────────────────────────────
+  @Column({ type: 'jsonb', nullable: true })
+  filesMap: Record<string, { name: string; file: string }[]> | null;
+
+  // ── Lotes con precio editados ────────────────────────────────────────────────
+  @Column({ type: 'jsonb', nullable: true })
+  lotesConPrecio: unknown[] | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

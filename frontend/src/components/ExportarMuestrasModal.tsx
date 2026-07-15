@@ -28,7 +28,7 @@ function muestraToRow(m: Muestra): ExcelRow {
     Codigo:           m.codigo,
     Fecha:            m.fecha ?? '',
     FechaCata:        m.fechaCata ?? '',
-    Tipo:             m.tipoMuestra === 'cafe' ? 'Café' : m.tipoMuestra === 'cacao' ? 'Cacao' : '',
+    Tipo:             m.tipoMuestra ? { pergamino: 'Pergamino', oro: 'Oro', grano_cacao: 'Grano Cacao' }[m.tipoMuestra] ?? '' : '',
     CategoriaMuestra: m.categoriaMuestra ?? '',
     Estado:           m.estado,
     Productor:        m.productor ? `${m.productor.nombre} ${m.productor.apellido ?? ''}`.trim() : `#${m.productorId}`,

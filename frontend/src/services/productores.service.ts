@@ -62,12 +62,26 @@ export interface Productor {
   tieneBanio: boolean | null;
   empresaTipo: string | null;
   empresaGerenteGeneral: string | null;
-  empresaAnioInicio: number | null;
+  empresaAnioInicio: string | null;
   empresaInfoLegal: string | null;
   empresaNombreComercial: string | null;
   empresaAcopiador: string | null;
   empresaInfoSunat: string | null;
   empresaCantTrabajadores: number | null;
+  registradoSunat: boolean | null;
+  activoSunat: boolean | null;
+  declaroImpuestosPrevios: boolean | null;
+  certificaciones: string | null;
+  cuentaConPoliticas: boolean | null;
+  cualesPoliticas: string | null;
+  registrosGestionDatos: string | null;
+  trabajadoresReglaSunafil: boolean | null;
+  denunciasUsurpacion: boolean | null;
+  cualesUsurpacion: string | null;
+  denunciasCorrupcion: boolean | null;
+  cualesCorrupcion: string | null;
+  incidenciasVisita: boolean | null;
+  cualesIncidencias: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -112,12 +126,26 @@ export type CreateProductorDto = {
   tieneBanio?: boolean | null;
   empresaTipo?: string | null;
   empresaGerenteGeneral?: string | null;
-  empresaAnioInicio?: number | null;
+  empresaAnioInicio?: string | null;
   empresaInfoLegal?: string | null;
   empresaNombreComercial?: string | null;
   empresaAcopiador?: string | null;
   empresaInfoSunat?: string | null;
   empresaCantTrabajadores?: number | null;
+  registradoSunat?: boolean | null;
+  activoSunat?: boolean | null;
+  declaroImpuestosPrevios?: boolean | null;
+  certificaciones?: string | null;
+  cuentaConPoliticas?: boolean | null;
+  cualesPoliticas?: string | null;
+  registrosGestionDatos?: string | null;
+  trabajadoresReglaSunafil?: boolean | null;
+  denunciasUsurpacion?: boolean | null;
+  cualesUsurpacion?: string | null;
+  denunciasCorrupcion?: boolean | null;
+  cualesCorrupcion?: string | null;
+  incidenciasVisita?: boolean | null;
+  cualesIncidencias?: string | null;
 };
 
 export type UpdateProductorDto = Partial<Omit<CreateProductorDto, 'campanaId'>>;
@@ -327,6 +355,20 @@ export const productoresService = {
         empresaAcopiador:         dto.empresaAcopiador         ?? null,
         empresaInfoSunat:         dto.empresaInfoSunat         ?? null,
         empresaCantTrabajadores:  dto.empresaCantTrabajadores  ?? null,
+        registradoSunat:          dto.registradoSunat          ?? null,
+        activoSunat:              dto.activoSunat              ?? null,
+        declaroImpuestosPrevios:  dto.declaroImpuestosPrevios  ?? null,
+        certificaciones:          dto.certificaciones          ?? null,
+        cuentaConPoliticas:       dto.cuentaConPoliticas       ?? null,
+        cualesPoliticas:          dto.cualesPoliticas          ?? null,
+        registrosGestionDatos:    dto.registrosGestionDatos    ?? null,
+        trabajadoresReglaSunafil: dto.trabajadoresReglaSunafil ?? null,
+        denunciasUsurpacion:      dto.denunciasUsurpacion      ?? null,
+        cualesUsurpacion:         dto.cualesUsurpacion         ?? null,
+        denunciasCorrupcion:      dto.denunciasCorrupcion      ?? null,
+        cualesCorrupcion:         dto.cualesCorrupcion         ?? null,
+        incidenciasVisita:        dto.incidenciasVisita        ?? null,
+        cualesIncidencias:        dto.cualesIncidencias        ?? null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -351,6 +393,18 @@ export const productoresService = {
     const { data } = await api.put<Productor>(`${BASE}/${id}`, dto);
     const cache = readCache().map((p) => (p.id === id ? data : p));
     writeCache(cache);
+    return data;
+  },
+
+  async updateEmpresaInfo(id: number, dto: UpdateProductorDto): Promise<Productor> {
+    const { data } = await api.put<Productor>(`${BASE}/${id}/empresa-info`, dto);
+    const cache = readCache().map((p) => (p.id === id ? data : p));
+    writeCache(cache);
+    return data;
+  },
+
+  async getEmpresaInfo(id: number): Promise<Productor> {
+    const { data } = await api.get<Productor>(`${BASE}/${id}/empresa-info`);
     return data;
   },
 

@@ -390,57 +390,6 @@ function TabEmpresa({ isOffline }: { isOffline: boolean }) {
         <p className="text-xs text-yellow-600">Modo offline — no se puede editar la configuración.</p>
       )}
 
-      <div className="pt-4 border-t border-gray-100">
-        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">
-          Variedades configurables
-          <span className="ml-2 text-[0.65rem] font-normal text-gray-400 normal-case">Usadas en lotes y muestras</span>
-        </p>
-        <div className="flex flex-wrap gap-2 mb-3 min-h-[2rem]">
-          {variedades.length === 0 && (
-            <span className="text-xs text-gray-400 italic">Sin variedades configuradas</span>
-          )}
-          {variedades.map((v) => (
-            <span key={v} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-800 border border-green-200">
-              {v}
-              {!isOffline && (
-                <button
-                  type="button"
-                  onClick={() => handleRemoveVariedad(v)}
-                  disabled={savingVar}
-                  className="text-green-600 hover:text-red-500 transition-colors disabled:opacity-40"
-                  aria-label={`Eliminar ${v}`}
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                  </svg>
-                </button>
-              )}
-            </span>
-          ))}
-        </div>
-        {!isOffline && (
-          <div className="flex gap-2 max-w-sm">
-            <input
-              type="text"
-              value={nuevaVariedad}
-              onChange={(e) => setNuevaVariedad(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddVariedad())}
-              placeholder="Nueva variedad…"
-              className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              maxLength={100}
-            />
-            <button
-              type="button"
-              onClick={handleAddVariedad}
-              disabled={savingVar || !nuevaVariedad.trim()}
-              className="px-3 py-2 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40"
-              style={{ backgroundColor: '#1A2B23' }}
-            >
-              Agregar
-            </button>
-          </div>
-        )}
-      </div>
     </form>
   );
 }

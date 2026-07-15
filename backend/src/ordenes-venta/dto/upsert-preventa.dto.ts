@@ -3,8 +3,9 @@ import { Type } from 'class-transformer';
 
 export class MuestraEnvioItemDto {
   @IsNumber() muestraId: number;
-  @IsOptional() @IsNumber() cantidad?: number | null;
-  @IsOptional() @IsNumber() costos?: number | null;
+  @IsOptional() @IsNumber() cantidad?:   number | null;
+  @IsOptional() @IsNumber() costos?:     number | null;
+  @IsOptional() @IsString() comentario?: string | null;
 }
 
 export class UpsertPreventaDto {

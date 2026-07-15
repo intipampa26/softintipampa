@@ -39,7 +39,7 @@ export const reportesService = {
   },
 
   downloadExcel(
-    tipo: 'productores' | 'lotes' | 'lotes-finales' | 'muestras' | 'ventas',
+    tipo: 'productores' | 'lotes' | 'lotes-finales' | 'muestras' | 'ventas' | 'parcelas',
     filters: ExportFilters = {},
     filename?: string,
   ) {
@@ -55,8 +55,12 @@ export const reportesService = {
     const url = `/api/reportes/export/${tipo}${qs}`;
 
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.blob())
+      .then(r => {
+        if (!r.ok) { console.error('Error descargando Excel:', r.status, r.statusText); return null; }
+        return r.blob();
+      })
       .then(blob => {
+        if (!blob) return;
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href     = blobUrl;

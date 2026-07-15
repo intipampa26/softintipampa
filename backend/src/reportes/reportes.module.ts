@@ -7,12 +7,13 @@ import { Lote }        from '../lotes/lote.entity';
 import { LoteFinal }   from '../lotes-finales/lote-final.entity';
 import { Muestra }     from '../muestras/muestra.entity';
 import { OrdenVenta }  from '../ordenes-venta/orden-venta.entity';
+import { Parcela }     from '../parcelas/parcela.entity';
 
 import { ReportesService }    from './reportes.service';
 import { ReportesController } from './reportes.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Campana, Productor, Lote, LoteFinal, Muestra, OrdenVenta])],
+  imports: [TypeOrmModule.forFeature([Campana, Productor, Lote, LoteFinal, Muestra, OrdenVenta, Parcela])],
   controllers: [ReportesController],
   providers:   [ReportesService],
 })

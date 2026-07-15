@@ -7,6 +7,8 @@ COPY package*.json ./
 RUN npm install --legacy-peer-deps
 
 COPY . .
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # ─── Stage 2: Serve with nginx ───────────────────────────────

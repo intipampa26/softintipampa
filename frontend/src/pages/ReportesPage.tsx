@@ -85,7 +85,7 @@ export function ReportesPage() {
     return parts.join('_');
   }
 
-  function handleExport(tipo: 'productores' | 'lotes' | 'lotes-finales' | 'muestras' | 'ventas') {
+  function handleExport(tipo: 'productores' | 'lotes' | 'lotes-finales' | 'muestras' | 'ventas' | 'parcelas') {
     setExporting(tipo);
     const filters: ExportFilters = {
       campanaId,
@@ -297,6 +297,12 @@ export function ReportesPage() {
             description="Órdenes de venta con cliente, monto, mercado y etapa"
             loading={exporting === 'ventas'}
             onClick={() => handleExport('ventas')}
+          />
+          <ExportBtn
+            label="Parcelas"
+            description="Listado de parcelas con área, variedades, altitud y prácticas de cultivo"
+            loading={exporting === 'parcelas'}
+            onClick={() => handleExport('parcelas')}
           />
         </div>
       </div>

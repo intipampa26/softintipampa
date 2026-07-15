@@ -275,6 +275,12 @@ function DeleteConfirm({ lote, onClose, onConfirm }: { lote: Lote; onClose: () =
   );
 }
 
+const PINNED_KEY = 'lotes:pinnedFilters';
+
+function loadPinned() {
+  try { return JSON.parse(localStorage.getItem(PINNED_KEY) ?? 'null'); } catch { return null; }
+}
+
 export function LotesPage() {
   const navigate = useNavigate();
   const { isOffline } = useNetworkStatus();
@@ -288,13 +294,26 @@ export function LotesPage() {
   const [tiposProducto, setTiposProducto] = useState<TipoProducto[]>([]);
   const [campanas,      setCampanas]      = useState<Campana[]>([]);
 
-  const [filterTipo,     setFilterTipo]     = useState('');
-  const [filterEstado,   setFilterEstado]   = useState<LoteEstado | ''>('');
-  const [filterCampana,  setFilterCampana]  = useState('');
-  const [filterVariedad, setFilterVariedad] = useState('');
-  const [filterPlanta,   setFilterPlanta]   = useState('');
-  const [filterProductor, setFilterProductor] = useState('');
+  const pinned = loadPinned();
+  const [filterTipo,      setFilterTipo]      = useState<string>(pinned?.filterTipo      ?? '');
+  const [filterEstado,    setFilterEstado]    = useState<LoteEstado | ''>(pinned?.filterEstado    ?? '');
+  const [filterCampana,   setFilterCampana]   = useState<string>(pinned?.filterCampana   ?? '');
+  const [filterVariedad,  setFilterVariedad]  = useState<string>(pinned?.filterVariedad  ?? '');
+  const [filterPlanta,    setFilterPlanta]    = useState<string>(pinned?.filterPlanta    ?? '');
+  const [filterProductor, setFilterProductor] = useState<string>(pinned?.filterProductor ?? '');
   const [productores, setProductores] = useState<Productor[]>([]);
+  const [isPinned, setIsPinned] = useState<boolean>(!!pinned);
+
+  function pinFilters() {
+    const data = { filterTipo, filterEstado, filterCampana, filterVariedad, filterPlanta, filterProductor };
+    localStorage.setItem(PINNED_KEY, JSON.stringify(data));
+    setIsPinned(true);
+  }
+
+  function unpinFilters() {
+    localStorage.removeItem(PINNED_KEY);
+    setIsPinned(false);
+  }
 
   useEffect(() => {
     tiposProductoService.getAll().then(setTiposProducto);
@@ -339,83 +358,93 @@ export function LotesPage() {
 
   return (
     <div className="min-h-full bg-white flex flex-col">
-      <div className="px-4 md:px-8 pt-6 pb-3">
-        <h1 className="font-headline text-2xl sm:text-3xl font-black uppercase tracking-wide text-gray-800" style={{ letterSpacing: '0.05em' }}>Lotes</h1>
-        <p className="text-xs text-gray-400 mt-0.5">Gestión de lotes de café y cacao desde adquisición hasta Lote Final</p>
+      <div className="px-4 md:px-8 pt-6 pb-3 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-headline text-2xl sm:text-3xl font-black uppercase tracking-wide text-gray-800" style={{ letterSpacing: '0.05em' }}>Lotes</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Gestión de lotes de café y cacao desde adquisición hasta Lote Final</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 pt-1">
+<button onClick={() => navigate('/dashboard/lotes-finales')} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: '#445D46' }}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Lotes Finales
+          </button>
+          <button onClick={() => navigate('/dashboard/mermas')} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: '#B45309' }}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Mermas
+          </button>
+          <button onClick={() => setModal('create')} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: '#1A2B23' }}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Nuevo
+          </button>
+        </div>
       </div>
 
-      <div className="px-4 md:px-8 py-4 bg-white border-b border-gray-100">
-        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-          <div className="flex flex-wrap gap-3 flex-1">
-            <div className="w-full sm:w-52">
-              <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Campaña</label>
-              <select
-                value={filterCampana}
-                onChange={e => { setFilterCampana(e.target.value); setPage(1); }}
-                className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Todas las campañas</option>
-                {campanas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-              </select>
-            </div>
-            <div className="w-full sm:w-40">
-              <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Tipo Producto</label>
-              <select value={filterTipo} onChange={e => { setFilterTipo(e.target.value); setPage(1); }} className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option value="">Todos</option>
-                {tiposProducto.map(t => <option key={t.id} value={t.id}>{t.tipo}</option>)}
-              </select>
-            </div>
-            <div className="w-full sm:w-40">
-              <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Productor</label>
-              <select
-                value={filterProductor}
-                onChange={e => { setFilterProductor(e.target.value); setPage(1); }}
-                className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Todos</option>
-                {productores.map(p => <option key={p.id} value={p.id}>{p.nombre} {p.apellido ?? ''}</option>)}
-              </select>
-            </div>
-            <div className="w-full sm:w-40">
-              <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Variedad</label>
-              <select
-                value={filterVariedad}
-                onChange={e => { setFilterVariedad(e.target.value); setPage(1); }}
-                className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Todas</option>
-                <optgroup label="Café">
-                  {VARIEDADES_CAFE.map(v => <option key={v} value={v}>{v}</option>)}
-                </optgroup>
-                <optgroup label="Cacao">
-                  {VARIEDADES_CACAO.map(v => <option key={v} value={v}>{v}</option>)}
-                </optgroup>
-              </select>
-            </div>
-            <div className="w-full sm:w-40">
-              <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Planta</label>
-              <select value={filterPlanta} onChange={e => { setFilterPlanta(e.target.value); setPage(1); }} className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-                <option value="">Todas</option>
-                {PLANTAS.map(p => <option key={p} value={p}>{p}</option>)}
-                <option value="OTRO">OTRO</option>
-              </select>
-            </div>
+      <div className="px-4 md:px-8 py-3 bg-white border-b border-gray-100">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-0">
+            <label className="block text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1">Campaña</label>
+            <select
+              value={filterCampana}
+              onChange={e => { setFilterCampana(e.target.value); setPage(1); }}
+              className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">Todas</option>
+              {campanas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            </select>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => navigate('/dashboard/lotes-finales')} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: '#2d5a3d' }}>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
-              <span className="hidden sm:inline">Lotes Finales</span>
-              <span className="sm:hidden">Finales</span>
-            </button>
-            <button onClick={() => navigate('/dashboard/mermas')} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: '#B45309' }}>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              Mermas
-            </button>
-            <button onClick={() => setModal('create')} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: '#1A2B23' }}>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-              Nuevo
-            </button>
+          <div className="w-32 shrink-0">
+            <label className="block text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1">Tipo</label>
+            <select value={filterTipo} onChange={e => { setFilterTipo(e.target.value); setPage(1); }} className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+              <option value="">Todos</option>
+              {tiposProducto.map(t => <option key={t.id} value={t.id}>{t.tipo}</option>)}
+            </select>
           </div>
+          <div className="flex-[2] min-w-[160px]">
+            <label className="block text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1">Productor</label>
+            <select
+              value={filterProductor}
+              onChange={e => { setFilterProductor(e.target.value); setPage(1); }}
+              className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">Todos</option>
+              {productores.map(p => <option key={p.id} value={p.id}>{p.nombre} {p.apellido ?? ''}</option>)}
+            </select>
+          </div>
+          <div className="w-36 shrink-0">
+            <label className="block text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1">Variedad</label>
+            <select
+              value={filterVariedad}
+              onChange={e => { setFilterVariedad(e.target.value); setPage(1); }}
+              className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">Todas</option>
+              <optgroup label="Café">
+                {VARIEDADES_CAFE.map(v => <option key={v} value={v}>{v}</option>)}
+              </optgroup>
+              <optgroup label="Cacao">
+                {VARIEDADES_CACAO.map(v => <option key={v} value={v}>{v}</option>)}
+              </optgroup>
+            </select>
+          </div>
+          <div className="w-36 shrink-0">
+            <label className="block text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1">Planta</label>
+            <select value={filterPlanta} onChange={e => { setFilterPlanta(e.target.value); setPage(1); }} className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+              <option value="">Todas</option>
+              {PLANTAS.map(p => <option key={p} value={p}>{p}</option>)}
+              <option value="OTRO">OTRO</option>
+            </select>
+          </div>
+          {isPinned ? (
+            <button onClick={unpinFilters} title="Quitar filtros fijados" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border shrink-0" style={{ backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#fcd34d' }}>
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+              Fijado
+            </button>
+          ) : (
+            <button onClick={pinFilters} title="Fijar filtros actuales" className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-gray-300 bg-white text-gray-500 hover:border-amber-400 hover:text-amber-700 hover:bg-amber-50 transition-colors shrink-0">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+              Fijar
+            </button>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-1.5 mt-3">

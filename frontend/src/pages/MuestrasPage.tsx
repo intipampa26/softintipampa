@@ -15,7 +15,7 @@ import {
   muestrasService,
   Muestra, EvaluacionFisica, EvaluacionSensorial,
   CreateMuestraDto, FilterMuestrasDto,
-  TipoMuestra, EstadoMuestra, PaginationMeta,
+  TipoMuestra, EstadoMuestra, ResultadoMuestra, PaginationMeta,
 } from '@/services/muestras.service';
 import { campanasService, Campana } from '@/services/campanas.service';
 import { productoresService, Productor } from '@/services/productores.service';
@@ -42,6 +42,24 @@ const ESTADO_BADGE: Record<string, string> = {
   en_proceso: 'bg-blue-100   text-blue-700   border border-blue-200',
 };
 
+const TIPO_MUESTRA_LABEL: Record<TipoMuestra, string> = {
+  pergamino:   'PERGAMINO',
+  oro:         'ORO',
+  grano_cacao: 'GRANO CACAO',
+};
+
+const RESULTADO_LABEL: Record<ResultadoMuestra, string> = {
+  aprobado:   'APROBADO',
+  descartado: 'DESCARTADO',
+};
+
+function esTipoCafe(t?: string | null): boolean {
+  return t === 'pergamino' || t === 'oro';
+}
+function esTipoCacao(t?: string | null): boolean {
+  return t === 'grano_cacao';
+}
+
 
 interface FormularioModalProps {
   muestra: Muestra;
@@ -52,11 +70,11 @@ interface FormularioModalProps {
 function FormularioModal({ muestra, onClose, onGuardado }: FormularioModalProps) {
   const esCacao = (muestra as any).loteFinal?.tipoProductoId === 2
     || (muestra as any).lote?.tipoProducto?.tipo === 'CACAO'
-    || muestra.tipoMuestra === 'cacao'
+    || esTipoCacao(muestra.tipoMuestra)
     || muestra.tipoProducto === 'cacao';
   const esCafe  = (muestra as any).loteFinal?.tipoProductoId === 1
     || (muestra as any).lote?.tipoProducto?.tipo === 'CAFE'
-    || muestra.tipoMuestra === 'cafe'
+    || esTipoCafe(muestra.tipoMuestra)
     || muestra.tipoProducto === 'cafe';
 
   const [tab,                  setTab]                 = useState<'sensorial' | 'fisica'>('sensorial');
@@ -364,7 +382,7 @@ function FormularioModal({ muestra, onClose, onGuardado }: FormularioModalProps)
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                 </svg>
-                PDF
+                Exportar Evaluaciones
               </>
             )}
           </button>
@@ -440,6 +458,7 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
     fecha:           initial?.fecha            ?? '',
     categoriaMuestra: initial?.categoriaMuestra ?? '',
     tipoMuestra:     initial?.tipoMuestra      ?? undefined,
+    resultado:       initial?.resultado        ?? undefined,
     estado:          initial?.estado           ?? 'pendiente',
     fechaCata:       initial?.fechaCata        ?? '',
     añoCosecha:      initial?.añoCosecha       ?? undefined,
@@ -461,8 +480,8 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
   const [calc, setCalc] = useState({ pergaminoKg: '', segundasKg: '', pajillaKg: '', cacaoRawKg: '', cascarillaKg: '' });
 
   const tipoNorm = ((form.tipoProducto ?? form.tipoMuestra) ?? '').toLowerCase();
-  const calcEsCafe  = tipoNorm.includes('cafe');
-  const calcEsCacao = tipoNorm.includes('cacao') && !tipoNorm.includes('cafe');
+  const calcEsCafe  = esTipoCafe(form.tipoMuestra) || tipoNorm.includes('cafe');
+  const calcEsCacao = esTipoCacao(form.tipoMuestra) || (tipoNorm.includes('cacao') && !tipoNorm.includes('cafe'));
 
   const cafeCalc = (() => {
     const p = parseFloat(calc.pergaminoKg) || 0;
@@ -694,12 +713,12 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
                             const loteId = Number(val.slice(5));
                             const lote   = lotes.find(l => l.id === loteId);
                             setTipoProductoId(lote?.tipoProductoId);
-                            setForm(f => ({ ...f, loteId, loteFinalId: undefined, tipoMuestra: (lote?.tipoProducto?.tipo?.toLowerCase() as TipoMuestra | undefined) ?? f.tipoMuestra, estadoLote: lote?.estado ?? undefined }));
+                            setForm(f => ({ ...f, loteId, loteFinalId: undefined, tipoMuestra: (lote?.tipoProducto?.tipo === 'CACAO' ? 'grano_cacao' : lote?.tipoProducto?.tipo === 'CAFE' ? 'pergamino' : f.tipoMuestra) as TipoMuestra | undefined, estadoLote: lote?.estado ?? undefined }));
                           } else {
                             const lfId = Number(val.slice(3));
                             const lf   = lotesFinalesPropios.find(l => l.id === lfId);
                             setTipoProductoId(lf?.tipoProductoId);
-                            setForm(f => ({ ...f, loteFinalId: lfId, loteId: undefined, tipoMuestra: (lf?.tipoProducto?.tipo?.toLowerCase() as TipoMuestra | undefined) ?? f.tipoMuestra, estadoLote: undefined }));
+                            setForm(f => ({ ...f, loteFinalId: lfId, loteId: undefined, tipoMuestra: (lf?.tipoProducto?.tipo === 'CACAO' ? 'grano_cacao' : lf?.tipoProducto?.tipo === 'CAFE' ? 'pergamino' : f.tipoMuestra) as TipoMuestra | undefined, estadoLote: undefined }));
                           }
                         }}
                         disabled={!form.productorId || loadingSub}
@@ -835,22 +854,38 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
                   className={cls}
                 >
                   <option value="">Sin especificar</option>
-                  <option value="cafe">Café</option>
-                  <option value="cacao">Cacao</option>
+                  <option value="pergamino">Pergamino</option>
+                  <option value="oro">Oro</option>
+                  <option value="grano_cacao">Grano Cacao</option>
                 </select>
               </div>
             )}
 
             {form.tipoMuestra && (
               <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${
-                form.tipoMuestra === 'cafe'
+                esTipoCafe(form.tipoMuestra)
                   ? 'bg-amber-100 text-amber-800 border border-amber-200'
                   : 'bg-purple-100 text-purple-800 border border-purple-200'
               }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${form.tipoMuestra === 'cafe' ? 'bg-amber-500' : 'bg-purple-500'}`} />
-                {form.tipoMuestra === 'cafe' ? 'CAFÉ — se evaluará con protocolo SCA' : 'CACAO — se evaluará con protocolo IICTE / Cut Test'}
+                <span className={`w-1.5 h-1.5 rounded-full ${esTipoCafe(form.tipoMuestra) ? 'bg-amber-500' : 'bg-purple-500'}`} />
+                {esTipoCafe(form.tipoMuestra)
+                  ? `${TIPO_MUESTRA_LABEL[form.tipoMuestra]} — se evaluará con protocolo SCA`
+                  : 'GRANO CACAO — se evaluará con protocolo IICTE / Cut Test'}
               </div>
             )}
+          </div>
+
+          <div className="max-w-xs">
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Resultado de evaluación</label>
+            <select
+              value={form.resultado ?? ''}
+              onChange={(e) => setForm(f => ({ ...f, resultado: (e.target.value as ResultadoMuestra) || undefined }))}
+              className={cls}
+            >
+              <option value="">Sin definir</option>
+              <option value="aprobado">✓ Aprobado — apto para acopio</option>
+              <option value="descartado">✗ Descartado</option>
+            </select>
           </div>
 
           <div className="space-y-3 pt-2 border-t border-gray-100">
@@ -863,10 +898,6 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Fecha de Muestreo</label>
                 <input type="date" value={form.fecha ?? ''} onChange={(e) => set('fecha')(e.target.value || undefined)} className={cls} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Fecha de cata</label>
-                <input type="date" value={form.fechaCata ?? ''} onChange={(e) => set('fechaCata')(e.target.value || undefined)} className={cls} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
@@ -999,12 +1030,6 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Base</label>
-                <input value={form.base ?? ''} onChange={(e) => set('base')(e.target.value)} className={cls} placeholder="Ej: SCA 2020" />
-              </div>
-            </div>
           </div>
 
           {(calcEsCafe || calcEsCacao) && (
@@ -1146,11 +1171,14 @@ function CardBtn({ label, color, title, onClick, icon }: {
 }
 
 interface CardProps {
-  muestra:        Muestra;
-  onEvaluaciones: () => void;
-  onEditar:       () => void;
-  onEliminar:     () => void;
-  onAdquirir?:    () => void;
+  muestra:          Muestra;
+  onEvaluaciones:   () => void;
+  onEditar:         () => void;
+  onEliminar:       () => void;
+  onAdquirir?:      () => void;
+  labelMode?:       boolean;
+  selected?:        boolean;
+  onToggleSelect?:  () => void;
 }
 
 function AdquirirModal({
@@ -1307,10 +1335,10 @@ function AdquirirModal({
   );
 }
 
-function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir }: CardProps) {
+function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir, labelMode, selected, onToggleSelect }: CardProps) {
   const esCacao = (muestra as any).loteFinal?.tipoProductoId === 2
     || (muestra as any).lote?.tipoProducto?.tipo === 'CACAO'
-    || muestra.tipoMuestra === 'cacao'
+    || esTipoCacao(muestra.tipoMuestra)
     || muestra.tipoProducto === 'cacao';
   const nombreProductor = muestra.productor
     ? `${muestra.productor.nombre} ${muestra.productor.apellido ?? ''}`.trim().toUpperCase()
@@ -1322,7 +1350,20 @@ function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir
     : null;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col hover:shadow-md transition-shadow">
+    <div
+      className={`bg-white rounded-2xl border shadow-sm flex flex-col transition-all ${labelMode ? 'cursor-pointer' : 'hover:shadow-md'} ${selected ? 'border-lime-400 ring-2 ring-lime-300' : 'border-gray-200'}`}
+      onClick={labelMode ? onToggleSelect : undefined}
+    >
+      {labelMode && (
+        <div className="flex items-center gap-2 px-3 pt-2.5 pb-0">
+          <div className={`w-4 h-4 rounded flex items-center justify-center border-2 shrink-0 transition-colors ${selected ? 'bg-lime-400 border-lime-400' : 'bg-white border-gray-300'}`}>
+            {selected && <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5L8 3" stroke="#1A2B23" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+          </div>
+          <span className="text-[0.6rem] font-bold uppercase tracking-wide" style={{ color: selected ? '#365314' : '#9ca3af' }}>
+            {selected ? 'Seleccionada' : 'Seleccionar'}
+          </span>
+        </div>
+      )}
       <div className="p-4 flex-1 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-col gap-0.5 min-w-0">
@@ -1365,12 +1406,24 @@ function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir
           </div>
         </div>
 
-        {muestra._pendiente && (
-          <span className="inline-flex items-center gap-1 text-[0.6rem] font-semibold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-            Pendiente de sync
-          </span>
-        )}
+        <div className="flex flex-wrap gap-1">
+          {muestra.tipoMuestra && (
+            <span className={`text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border whitespace-nowrap ${esTipoCafe(muestra.tipoMuestra) ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-purple-50 text-purple-700 border-purple-200'}`}>
+              {TIPO_MUESTRA_LABEL[muestra.tipoMuestra]}
+            </span>
+          )}
+          {muestra.resultado && (
+            <span className={`text-[0.6rem] font-bold uppercase px-2 py-0.5 rounded-full border whitespace-nowrap ${muestra.resultado === 'aprobado' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+              {RESULTADO_LABEL[muestra.resultado]}
+            </span>
+          )}
+          {muestra._pendiente && (
+            <span className="inline-flex items-center gap-1 text-[0.6rem] font-semibold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+              Pendiente de sync
+            </span>
+          )}
+        </div>
 
         {fechaFormateada && <p className="text-xs text-gray-500 font-medium">{fechaFormateada}</p>}
 
@@ -1472,6 +1525,8 @@ export function MuestrasPage() {
   const [filterFechaHasta]  = useState(searchParams.get('fechaHasta') ?? '');
   const [filterEstadoLote,  setFilterEstadoLote]  = useState(searchParams.get('estadoLote') ?? '');
   const [filterVariedad,    setFilterVariedad]    = useState(searchParams.get('variedad')   ?? '');
+  const [filterResultado,   setFilterResultado]   = useState<ResultadoMuestra | ''>(searchParams.get('resultado') as ResultadoMuestra ?? '');
+  const [filterSinLote,     setFilterSinLote]     = useState(searchParams.get('sinLote') === 'true');
 
   
   const [campanas,      setCampanas]      = useState<Campana[]>([]);
@@ -1486,11 +1541,34 @@ export function MuestrasPage() {
   const [loading, setLoading]   = useState(true);
   const [page, setPage]         = useState(Number(searchParams.get('page') ?? '1'));
 
-  
+
   const [modal,    setModal]    = useState<ModalType>(null);
   const [selected, setSelected] = useState<Muestra | null>(null);
   const [showProximamente, setShowProximamente] = useState(false);
   const [syncDone, setSyncDone] = useState(false);
+
+  const [labelMode,          setLabelMode]          = useState(false);
+  const [selectedEtiquetas,  setSelectedEtiquetas]  = useState<Set<number>>(new Set());
+  const [generatingPdf,      setGeneratingPdf]      = useState(false);
+
+  function toggleEtiqueta(id: number) {
+    setSelectedEtiquetas(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  async function handleGenerarEtiquetas() {
+    const seleccionadas = muestras.filter(m => selectedEtiquetas.has(m.id));
+    if (!seleccionadas.length) return;
+    setGeneratingPdf(true);
+    const { generateEtiquetasMuestrasPdf } = await import('@/utils/etiquetas-muestras-pdf');
+    generateEtiquetasMuestrasPdf(seleccionadas);
+    setGeneratingPdf(false);
+    setLabelMode(false);
+    setSelectedEtiquetas(new Set());
+  }
 
   
   useEffect(() => {
@@ -1504,9 +1582,11 @@ export function MuestrasPage() {
     if (filterFechaHasta)  params.fechaHasta  = filterFechaHasta;
     if (filterEstadoLote)  params.estadoLote  = filterEstadoLote;
     if (filterVariedad)    params.variedad    = filterVariedad;
+    if (filterResultado)   params.resultado   = filterResultado;
+    if (filterSinLote)     params.sinLote     = 'true';
     if (page > 1)          params.page        = String(page);
     setSearchParams(params, { replace: true });
-  }, [filterCampanaId, filterProductorId, filterLote, filterEstado, filterTipo, filterFechaDesde, filterFechaHasta, filterEstadoLote, filterVariedad, page]); 
+  }, [filterCampanaId, filterProductorId, filterLote, filterEstado, filterTipo, filterFechaDesde, filterFechaHasta, filterEstadoLote, filterVariedad, filterResultado, filterSinLote, page]);
 
   
   useEffect(() => {
@@ -1542,7 +1622,9 @@ export function MuestrasPage() {
     ...(filterFechaHasta  && { fechaHasta:  filterFechaHasta         }),
     ...(filterEstadoLote  && { estadoLote:  filterEstadoLote         }),
     ...(filterVariedad    && { variedad:    filterVariedad           }),
-  }), [page, filterCampanaId, filterProductorId, filterLote, filterEstado, filterTipo, filterFechaDesde, filterFechaHasta, filterEstadoLote, filterVariedad]);
+    ...(filterResultado   && { resultado:  filterResultado           }),
+    ...(filterSinLote     && { sinLote:    true                      }),
+  }), [page, filterCampanaId, filterProductorId, filterLote, filterEstado, filterTipo, filterFechaDesde, filterFechaHasta, filterEstadoLote, filterVariedad, filterResultado, filterSinLote]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1729,10 +1811,10 @@ export function MuestrasPage() {
               </button>
             ))}
             <div className="w-px bg-gray-300 self-stretch" />
-            {(['cafe', 'cacao'] as const).map((t) => (
+            {(['pergamino', 'oro', 'grano_cacao'] as TipoMuestra[]).map((t) => (
               <button
                 key={t}
-                onClick={() => changeFilter(setFilterTipo)(filterTipo === t ? '' : t)}
+                onClick={() => { setPage(1); setFilterTipo(filterTipo === t ? '' : t); }}
                 className={`px-2.5 py-1 rounded-full text-[0.65rem] font-semibold border transition-all ${
                   filterTipo === t
                     ? 'text-white border-transparent'
@@ -1740,7 +1822,7 @@ export function MuestrasPage() {
                 }`}
                 style={filterTipo === t ? { backgroundColor: '#283F34' } : {}}
               >
-                {t === 'cafe' ? 'CAFE' : 'CACAO'}
+                {TIPO_MUESTRA_LABEL[t]}
               </button>
             ))}
           </div>
@@ -1768,6 +1850,19 @@ export function MuestrasPage() {
                 Importar
               </button>
             )}
+            <button
+              onClick={() => { setLabelMode(v => !v); setSelectedEtiquetas(new Set()); }}
+              aria-label="Generar etiquetas PDF"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wide hover:opacity-90 active:scale-[0.98] transition-all"
+              style={labelMode
+                ? { backgroundColor: '#1A2B23', color: '#bef264' }
+                : { backgroundColor: '#e5e7eb', color: '#374151' }}
+            >
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 014-4z"/>
+              </svg>
+              {labelMode ? 'Cancelar etiquetas' : 'Etiquetas PDF'}
+            </button>
             <button
               onClick={() => { setSelected(null); setModal('create'); }}
               aria-label="Agregar nueva muestra"
@@ -1837,6 +1932,9 @@ export function MuestrasPage() {
                   onEditar={()       => { setSelected(m); setModal('edit'); }}
                   onEliminar={()     => { setSelected(m); setModal('delete'); }}
                   onAdquirir={m.lote?.estado === 'PRE_ADQUISICION' ? () => handleAdquirir(m) : undefined}
+                  labelMode={labelMode}
+                  selected={selectedEtiquetas.has(m.id)}
+                  onToggleSelect={() => toggleEtiqueta(m.id)}
                 />
               ))}
             </div>
@@ -1895,6 +1993,33 @@ export function MuestrasPage() {
           onClose={() => { setModal(null); setSelected(null); }}
           onConfirm={confirmarAdquisicion}
         />
+      )}
+
+      {labelMode && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl border"
+          style={{ backgroundColor: '#1A2B23', borderColor: '#2d4a3e', minWidth: 280 }}>
+          <div className="flex-1">
+            <p className="text-xs font-black text-white">
+              {selectedEtiquetas.size === 0
+                ? 'Selecciona muestras para etiquetar'
+                : `${selectedEtiquetas.size} muestra${selectedEtiquetas.size > 1 ? 's' : ''} seleccionada${selectedEtiquetas.size > 1 ? 's' : ''}`}
+            </p>
+            <p className="text-[0.6rem] text-white/50">Toca cada card para seleccionar · 29×62 mm</p>
+          </div>
+          <button
+            onClick={handleGenerarEtiquetas}
+            disabled={selectedEtiquetas.size === 0 || generatingPdf}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wide disabled:opacity-40 transition-all hover:opacity-90 active:scale-95"
+            style={{ backgroundColor: '#bef264', color: '#1A2B23' }}
+          >
+            {generatingPdf ? (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4}/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            )}
+            Descargar PDF
+          </button>
+        </div>
       )}
 
       {showProximamente && <ProximamenteToast onDismiss={() => setShowProximamente(false)} />}

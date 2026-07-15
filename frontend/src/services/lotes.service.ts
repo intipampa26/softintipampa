@@ -83,8 +83,9 @@ class LotesService {
     if (!navigator.onLine) return readCache();
     try {
       const res  = await api.get('/lotes', { params: filter });
-      const data: Lote[] = Array.isArray(res.data) ? res.data : [];
-      const meta: PaginationMeta = (res as unknown as { meta: PaginationMeta }).meta ?? { total: 0, page: 1, lastPage: 1, limit: 10 };
+      const body = res.data;
+      const data: Lote[] = Array.isArray(body.data) ? body.data : Array.isArray(body) ? body : [];
+      const meta: PaginationMeta = body.meta ?? { total: data.length, page: 1, lastPage: 1, limit: 10 };
       const result = { data, meta };
       localStorage.setItem(CACHE_KEY, JSON.stringify(result));
       return result;

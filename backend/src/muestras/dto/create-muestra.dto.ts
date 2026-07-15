@@ -3,7 +3,7 @@ import {
   IsOptional, IsString, Max, MaxLength, Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { EstadoMuestra } from '../muestra.entity';
+import { EstadoMuestra, ResultadoMuestra, TipoMuestraProducto } from '../muestra.entity';
 
 export class CreateMuestraDto {
    
@@ -19,7 +19,8 @@ export class CreateMuestraDto {
   @IsDateString() @IsOptional() fechaRegistro?: string;
 
    
-  @IsString() @IsOptional() @MaxLength(100) tipoMuestra?: string;
+  @IsEnum(TipoMuestraProducto) @IsOptional() tipoMuestra?: TipoMuestraProducto;
+  @IsEnum(ResultadoMuestra)    @IsOptional() resultado?: ResultadoMuestra;
   @IsString() @IsOptional() @MaxLength(50)  estadoLote?: string;
 
   @IsNumber() @Min(0) @IsOptional() @Type(() => Number) rendimiento?: number;

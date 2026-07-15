@@ -21,6 +21,17 @@ export enum EstadoMuestra {
   RECHAZADA  = 'rechazada',
 }
 
+export enum TipoMuestraProducto {
+  PERGAMINO   = 'pergamino',
+  ORO         = 'oro',
+  GRANO_CACAO = 'grano_cacao',
+}
+
+export enum ResultadoMuestra {
+  APROBADO   = 'aprobado',
+  DESCARTADO = 'descartado',
+}
+
 @Entity('muestras')
 export class Muestra {
   @PrimaryGeneratedColumn()
@@ -90,8 +101,11 @@ export class Muestra {
   @Column({ type: 'date', nullable: true })
   fechaRegistro: string | null;
 
-  @Column({ length: 100, nullable: true })
-  tipoMuestra: string | null;
+  @Column({ type: 'enum', enum: TipoMuestraProducto, nullable: true })
+  tipoMuestra: TipoMuestraProducto | null;
+
+  @Column({ type: 'enum', enum: ResultadoMuestra, nullable: true })
+  resultado: ResultadoMuestra | null;
 
   @Column({ length: 50, nullable: true })
   estadoLote: string | null;

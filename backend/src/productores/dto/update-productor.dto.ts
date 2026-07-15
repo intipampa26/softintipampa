@@ -71,10 +71,32 @@ export class UpdateProductorDto {
 
   @IsString() @IsOptional() @MaxLength(100)  empresaTipo?: string | null;
   @IsString() @IsOptional() @MaxLength(200)  empresaGerenteGeneral?: string | null;
-  @IsInt()    @IsOptional() @Type(() => Number) empresaAnioInicio?: number | null;
+  @IsString() @IsOptional() @MaxLength(10)      empresaAnioInicio?: string | null;
   @IsString() @IsOptional()                  empresaInfoLegal?: string | null;
   @IsString() @IsOptional() @MaxLength(200)  empresaNombreComercial?: string | null;
   @IsString() @IsOptional() @MaxLength(200)  empresaAcopiador?: string | null;
   @IsString() @IsOptional()                  empresaInfoSunat?: string | null;
   @IsInt()    @IsOptional() @Type(() => Number) empresaCantTrabajadores?: number | null;
+
+  @IsBoolean() @IsOptional() registradoSunat?: boolean | null;
+  @IsBoolean() @IsOptional() activoSunat?: boolean | null;
+  @IsBoolean() @IsOptional() declaroImpuestosPrevios?: boolean | null;
+
+  @IsString() @IsOptional() @MaxLength(100) certificaciones?: string | null;
+
+  @IsBoolean() @IsOptional() cuentaConPoliticas?: boolean | null;
+  @IsString()  @IsOptional() cualesPoliticas?: string | null;
+
+  @IsString() @IsOptional() @MaxLength(100) registrosGestionDatos?: string | null;
+
+  @IsBoolean() @IsOptional() trabajadoresReglaSunafil?: boolean | null;
+
+  @IsBoolean() @IsOptional() denunciasUsurpacion?: boolean | null;
+  @IsString()  @IsOptional() cualesUsurpacion?: string | null;
+
+  @IsBoolean() @IsOptional() denunciasCorrupcion?: boolean | null;
+  @IsString()  @IsOptional() cualesCorrupcion?: string | null;
+
+  @IsBoolean() @IsOptional() incidenciasVisita?: boolean | null;
+  @IsString()  @IsOptional() cualesIncidencias?: string | null;
 }

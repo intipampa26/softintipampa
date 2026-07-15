@@ -66,4 +66,41 @@ export class UpsertExportacionDto {
   @IsOptional() @IsString()  banco?: string;
   @IsOptional() @IsString()  nroCuenta?: string;
   @IsOptional() @IsString()  observCierre?: string;
+
+  // ── Plan de Exportación ───────────────────────────────────────────────────────
+  @IsOptional() @IsDateString() fechaCutoff?: string;
+  @IsOptional() @IsDateString() fechaFitosanitario?: string;
+  @IsOptional() @IsDateString() fechaEntregaCarga?: string;
+  @IsOptional() @IsString()  agenteAduanasPlan?: string;
+  @IsOptional() @IsString()  agenteCarga?: string;
+  @IsOptional() @IsNumber()  valorProductos?: number;
+  @IsOptional() @IsNumber()  pesoTotalPlan?: number;
+  @IsOptional() @IsString()  puertoExportacion?: string;
+  @IsOptional() @IsBoolean() fullContainer?: boolean;
+  @IsOptional() @IsInt()     cantidadPaletasPlan?: number;
+  @IsOptional() @IsBoolean() deshumedecedores?: boolean;
+  @IsOptional() @IsBoolean() controlTemperatura?: boolean;
+  @IsOptional() @IsString()  numBooking?: string;
+
+  // ── Despacho Aduanero ─────────────────────────────────────────────────────────
+  @IsOptional() @IsDateString() fechaIngresoCarga?: string;
+  @IsOptional() @IsDateString() fechaSenasa?: string;
+  @IsOptional() @IsInt()     cantidadPalletsDesp?: number;
+  @IsOptional() @IsInt()     cantidadPaquetes?: number;
+
+  // ── Cierre de Exportación ─────────────────────────────────────────────────────
+  @IsOptional() @IsNumber()  costoTransporteAlmacen?: number;
+  @IsOptional() @IsNumber()  costoComisionAgente?: number;
+  @IsOptional() @IsNumber()  costoAlmacenPortuario?: number;
+  @IsOptional() @IsNumber()  costoFlete?: number;
+  @IsOptional() @IsNumber()  costoSeguro?: number;
+  @IsOptional() @IsNumber()  pesoTotalCierre?: number;
+  @IsOptional() @IsString()  nroCertFito?: string;
+  @IsOptional() @IsString()  nroCertOrigen?: string;
+  @IsOptional() @IsString()  guiaRemisionCierre?: string;
+  @IsOptional() @IsString()  facturaSupanat?: string;
+
+  // ── Files + Lotes ─────────────────────────────────────────────────────────────
+  @IsOptional() @IsObject()  filesMap?: Record<string, unknown[]>;
+  @IsOptional() @IsObject()  lotesConPrecio?: unknown[];
 }

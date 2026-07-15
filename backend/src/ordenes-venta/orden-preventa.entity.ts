@@ -6,9 +6,10 @@ import {
 import { OrdenVenta } from './orden-venta.entity';
 
 export interface MuestraEnvioItem {
-  muestraId: number;
-  cantidad:  number | null;
-  costos:    number | null;
+  muestraId:  number;
+  cantidad:   number | null;
+  costos:     number | null;
+  comentario: string | null;
 }
 
 @Entity('orden_preventa')

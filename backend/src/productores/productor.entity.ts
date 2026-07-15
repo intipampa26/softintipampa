@@ -153,8 +153,8 @@ export class Productor {
   @Column({ length: 200, nullable: true })
   empresaGerenteGeneral: string | null;
 
-  @Column({ nullable: true, type: 'int' })
-  empresaAnioInicio: number | null;
+  @Column({ nullable: true, length: 10 })
+  empresaAnioInicio: string | null;
 
   @Column({ type: 'text', nullable: true })
   empresaInfoLegal: string | null;
@@ -170,6 +170,48 @@ export class Productor {
 
   @Column({ nullable: true, type: 'int' })
   empresaCantTrabajadores: number | null;
+
+  @Column({ nullable: true })
+  registradoSunat: boolean | null;
+
+  @Column({ nullable: true })
+  activoSunat: boolean | null;
+
+  @Column({ nullable: true })
+  declaroImpuestosPrevios: boolean | null;
+
+  @Column({ length: 100, nullable: true })
+  certificaciones: string | null;
+
+  @Column({ nullable: true })
+  cuentaConPoliticas: boolean | null;
+
+  @Column({ type: 'text', nullable: true })
+  cualesPoliticas: string | null;
+
+  @Column({ length: 100, nullable: true })
+  registrosGestionDatos: string | null;
+
+  @Column({ nullable: true })
+  trabajadoresReglaSunafil: boolean | null;
+
+  @Column({ nullable: true })
+  denunciasUsurpacion: boolean | null;
+
+  @Column({ type: 'text', nullable: true })
+  cualesUsurpacion: string | null;
+
+  @Column({ nullable: true })
+  denunciasCorrupcion: boolean | null;
+
+  @Column({ type: 'text', nullable: true })
+  cualesCorrupcion: string | null;
+
+  @Column({ nullable: true })
+  incidenciasVisita: boolean | null;
+
+  @Column({ type: 'text', nullable: true })
+  cualesIncidencias: string | null;
 
   @Column({ default: true })
   activo: boolean;

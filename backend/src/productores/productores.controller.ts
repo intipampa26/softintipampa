@@ -91,6 +91,20 @@ export class ProductoresController {
     return { url: `/uploads/productores/${file.filename}` };
   }
 
+  @Get(':id/empresa-info')
+  getEmpresaInfo(@Param('id', ParseIntPipe) id: number) {
+    return this.service.findOne(id);
+  }
+
+  @Put(':id/empresa-info')
+  @Post(':id/empresa-info')
+  updateEmpresaInfo(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateProductorDto,
+  ) {
+    return this.service.update(id, dto);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.service.findOne(id);

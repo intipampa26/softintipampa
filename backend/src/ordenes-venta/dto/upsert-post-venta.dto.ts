@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNumber, IsDateString, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsDateString, IsInt, IsBoolean, IsObject, Min, Max } from 'class-validator';
 
 export class UpsertPostVentaDto {
   @IsOptional() @IsString()  nroFactura?: string;
@@ -27,4 +27,11 @@ export class UpsertPostVentaDto {
   @IsOptional() @IsDateString() fechaResolucion?: string;
   @IsOptional() @IsString()  responsable?: string;
   @IsOptional() @IsString()  observReclamo?: string;
+
+  // ── Importación ───────────────────────────────────────────────────────────────
+  @IsOptional() @IsString()  agenteAduanaCliente?: string;
+  @IsOptional() @IsDateString() fechaLlegada?: string;
+  @IsOptional() @IsString()  puertoLlegada?: string;
+  @IsOptional() @IsBoolean() inspeccionDestino?: boolean;
+  @IsOptional() @IsObject()  filesMapPostVenta?: Record<string, unknown[]>;
 }

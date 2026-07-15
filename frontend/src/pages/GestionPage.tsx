@@ -469,10 +469,12 @@ function OrderModal({ initial, onClose, onSave }: ModalProps) {
     montoUSD:     initial?.montoUSD     ?? 0,
     moneda:       (initial?.moneda      ?? 'USD') as 'USD' | 'PEN',
     estado:       (initial?.estado      ?? 'pre_venta') as EstadoOrden,
+    contactoCB:   (initial as any)?.contactoCB  ?? '',
   });
   const [clientes,          setClientes]          = useState<Cliente[]>([]);
   const [campanas,          setCampanas]          = useState<Campana[]>([]);
   const [selectedCampanaId, setSelectedCampanaId] = useState<number | null>(null);
+  const [clienteInfo,       setClienteInfo]       = useState<Cliente | null>(null);
   const [saving,            setSaving]            = useState(false);
   const toast = useToast();
 
@@ -480,6 +482,12 @@ function OrderModal({ initial, onClose, onSave }: ModalProps) {
     clientesService.getPage(1, 200).then(r => setClientes(r.data));
     campanasService.getPage(1, 200).then(r => setCampanas(r.data));
   }, []);
+
+  useEffect(() => {
+    if (!form.cliente) { setClienteInfo(null); return; }
+    const found = clientes.find(c => c.nombre === form.cliente) ?? null;
+    setClienteInfo(found);
+  }, [form.cliente, clientes]);
 
   const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(f => ({ ...f, [k]: v }));
 
@@ -550,7 +558,7 @@ function OrderModal({ initial, onClose, onSave }: ModalProps) {
               </select>
             ))}
             {field('Fecha', <input type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} className={inputCls} style={inpStyle} />)}
-            {field('Destino', <input value={form.destino} onChange={e => set('destino', e.target.value)} className={inputCls} style={inpStyle} placeholder="País destino…" />)}
+{field('Contacto CB', <input value={form.contactoCB} onChange={e => set('contactoCB', e.target.value)} className={inputCls} style={inpStyle} placeholder="Nombre del contacto CB…" />)}
             {field('Estado', (
               <select value={form.estado} onChange={e => set('estado', e.target.value as EstadoOrden)} className={inputCls} style={inpStyle}>
                 {(Object.entries(ESTADO_CFG) as [EstadoOrden, typeof ESTADO_CFG[EstadoOrden]][]).map(([k, v]) => (
@@ -559,6 +567,44 @@ function OrderModal({ initial, onClose, onSave }: ModalProps) {
               </select>
             ))}
           </div>
+
+          {clienteInfo && (
+            <div className="rounded-xl border p-3 space-y-1.5" style={{ borderColor: BD, backgroundColor: BG }}>
+              <p className="text-[0.6rem] font-black uppercase tracking-widest" style={{ color: CP }}>Datos del cliente</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                {clienteInfo.nroDocumento && (
+                  <div>
+                    <p className="text-[0.58rem] font-semibold uppercase tracking-wide text-gray-400">RUC / DNI</p>
+                    <p className="text-xs font-mono font-bold text-gray-700">{clienteInfo.nroDocumento}</p>
+                  </div>
+                )}
+                {clienteInfo.pais && (
+                  <div>
+                    <p className="text-[0.58rem] font-semibold uppercase tracking-wide text-gray-400">País</p>
+                    <p className="text-xs font-semibold text-gray-700">{clienteInfo.pais}</p>
+                  </div>
+                )}
+                {clienteInfo.telefono && (
+                  <div>
+                    <p className="text-[0.58rem] font-semibold uppercase tracking-wide text-gray-400">Teléfono</p>
+                    <p className="text-xs text-gray-700">{clienteInfo.telefono}</p>
+                  </div>
+                )}
+                {clienteInfo.email && (
+                  <div>
+                    <p className="text-[0.58rem] font-semibold uppercase tracking-wide text-gray-400">Email</p>
+                    <p className="text-xs text-gray-700 truncate">{clienteInfo.email}</p>
+                  </div>
+                )}
+                {clienteInfo.direccion && (
+                  <div className="col-span-2">
+                    <p className="text-[0.58rem] font-semibold uppercase tracking-wide text-gray-400">Dirección</p>
+                    <p className="text-xs text-gray-700">{clienteInfo.direccion}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         

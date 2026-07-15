@@ -183,7 +183,7 @@ export class OrdenesVentaController {
   )
   uploadExportacionFile(
     @Param('id', ParseIntPipe) id: number,
-    @Param('tipo') tipo: 'documentos' | 'reportes',
+    @Param('tipo') tipo: string,
     @UploadedFile() file: any,
   ) {
     return this.service.uploadExportacionFile(id, tipo, file);
@@ -192,7 +192,7 @@ export class OrdenesVentaController {
   @Delete(':id/exportacion/upload/:tipo/:filename')
   deleteExportacionFile(
     @Param('id', ParseIntPipe) id: number,
-    @Param('tipo') tipo: 'documentos' | 'reportes',
+    @Param('tipo') tipo: string,
     @Param('filename') filename: string,
   ) {
     return this.service.deleteExportacionFile(id, tipo, filename);
@@ -209,5 +209,39 @@ export class OrdenesVentaController {
     @Body() dto: UpsertPostVentaDto,
   ) {
     return this.service.upsertPostVenta(id, dto);
+  }
+
+  @Post(':id/post-venta/upload/:tipo')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req: any, _file: any, cb: any) => {
+          const dir = join(process.cwd(), 'uploads', 'post-venta', req.params.id, req.params.tipo);
+          mkdirSync(dir, { recursive: true });
+          cb(null, dir);
+        },
+        filename: (_req: any, file: any, cb: any) => {
+          const uniquePrefix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+          cb(null, `${uniquePrefix}${extname(file.originalname)}`);
+        },
+      }),
+      limits: { fileSize: 20 * 1024 * 1024 },
+    }),
+  )
+  uploadPostVentaFile(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('tipo') tipo: string,
+    @UploadedFile() file: any,
+  ) {
+    return this.service.uploadPostVentaFile(id, tipo, file);
+  }
+
+  @Delete(':id/post-venta/upload/:tipo/:filename')
+  deletePostVentaFile(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('tipo') tipo: string,
+    @Param('filename') filename: string,
+  ) {
+    return this.service.deletePostVentaFile(id, tipo, filename);
   }
 }

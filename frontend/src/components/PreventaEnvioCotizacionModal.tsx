@@ -79,7 +79,7 @@ export function PreventaEnvioCotizacionModal({ orden, onClose, onGoToStep }: Pro
               </div>
             </div>
             <div>
-              {fieldLabel(`Precio (${moneda} / kg)`)}
+              {fieldLabel('Total de venta')}
               <div className="flex gap-2">
                 <div className="flex rounded-xl overflow-hidden border shrink-0" style={{ borderColor: BD }}>
                   {(['USD', 'PEN'] as const).map(m => (
@@ -129,8 +129,8 @@ export function PreventaEnvioCotizacionModal({ orden, onClose, onGoToStep }: Pro
               </div>
             </div>
             <div>
-              {fieldLabel('Validez de la oferta (días)')}
-              <input type="number" min={1} value={validez} onChange={e => setValidez(e.target.value)} className={INP} style={inpStyle} placeholder="15" />
+              {fieldLabel('Mes de exportación (est.)')}
+              <input type="month" value={validez} onChange={e => setValidez(e.target.value)} className={INP} style={inpStyle} />
             </div>
           </div>
 

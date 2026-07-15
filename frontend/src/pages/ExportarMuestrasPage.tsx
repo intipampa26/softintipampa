@@ -100,7 +100,7 @@ function muestraToRow(item: PreviewItem): PreviewRow {
     'Código':            m.codigo,
     'Fecha':             m.fecha ?? '',
     'Fecha Cata':        m.fechaCata ?? '',
-    'Tipo Muestra':      m.tipoMuestra ? (m.tipoMuestra === 'cafe' ? 'Café' : 'Cacao') : '',
+    'Tipo Muestra':      m.tipoMuestra ? { pergamino: 'Pergamino', oro: 'Oro', grano_cacao: 'Grano Cacao' }[m.tipoMuestra] ?? '' : '',
     'Categoría':         m.categoriaMuestra ?? '',
     'Estado':            m.estado,
     'Estado Lote':       m.estadoLote ?? '',

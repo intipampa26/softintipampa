@@ -1,0 +1,302 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1420" width="1000" height="1420" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+
+  <!-- Fondo -->
+  <rect width="1000" height="1420" fill="#F4F6F4"/>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- HEADER -->
+  <!-- ══════════════════════════════════════════════ -->
+  <rect x="0" y="0" width="1000" height="80" fill="#283F34"/>
+  <text x="500" y="30" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="600" letter-spacing="4" opacity="0.7">COLLECTIVE BEAN — INTIPAMPA ERP</text>
+  <text x="500" y="58" text-anchor="middle" fill="#FFFFFF" font-size="22" font-weight="700" letter-spacing="1">FLUJO DE GESTIÓN</text>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- FASE LABELS (swimlanes verticales) -->
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- Fase 1: Configuración -->
+  <rect x="20" y="100" width="960" height="30" fill="#6B8472" rx="6" opacity="0.18"/>
+  <text x="500" y="120" text-anchor="middle" fill="#3A5A40" font-size="10" font-weight="700" letter-spacing="3">FASE 1 — CONFIGURACIÓN</text>
+
+  <!-- Fase 2: Acopio -->
+  <rect x="20" y="310" width="960" height="30" fill="#7A8C9C" rx="6" opacity="0.18"/>
+  <text x="500" y="330" text-anchor="middle" fill="#3A5070" font-size="10" font-weight="700" letter-spacing="3">FASE 2 — ACOPIO</text>
+
+  <!-- Fase 3: Proceso -->
+  <rect x="20" y="640" width="960" height="30" fill="#9C8468" rx="6" opacity="0.18"/>
+  <text x="500" y="660" text-anchor="middle" fill="#5A4A30" font-size="10" font-weight="700" letter-spacing="3">FASE 3 — PROCESO (TRILLA)</text>
+
+  <!-- Fase 4: Ventas -->
+  <rect x="20" y="920" width="960" height="30" fill="#8A9E8A" rx="6" opacity="0.18"/>
+  <text x="500" y="940" text-anchor="middle" fill="#3A5A40" font-size="10" font-weight="700" letter-spacing="3">FASE 4 — GESTIÓN DE VENTAS</text>
+
+  <!-- Fase 5: Indicadores -->
+  <rect x="20" y="1300" width="960" height="30" fill="#283F34" rx="6" opacity="0.15"/>
+  <text x="500" y="1320" text-anchor="middle" fill="#283F34" font-size="10" font-weight="700" letter-spacing="3">FASE 5 — INDICADORES</text>
+
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- NODO helper: definimos bloques reutilizables -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <!-- ─────────────────── FASE 1: CONFIGURACIÓN ─────────────────── -->
+
+  <!-- CAMPAÑA -->
+  <rect x="380" y="148" width="240" height="80" rx="12" fill="#FFFFFF" stroke="#6B8472" stroke-width="2"/>
+  <rect x="380" y="148" width="240" height="28" rx="12" fill="#6B8472"/>
+  <rect x="380" y="164" width="240" height="12" fill="#6B8472"/>
+  <text x="500" y="167" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="700" letter-spacing="1">CAMPAÑA</text>
+  <text x="500" y="185" text-anchor="middle" fill="#4A6A50" font-size="9.5">Período de acopio (ej: 2025)</text>
+  <text x="500" y="200" text-anchor="middle" fill="#4A6A50" font-size="9.5">Temporada: café / cacao</text>
+  <text x="500" y="215" text-anchor="middle" fill="#4A6A50" font-size="9.5">Fecha inicio – Fecha fin</text>
+
+  <!-- Flecha campaña → productores -->
+  <line x1="500" y1="228" x2="500" y2="258" stroke="#6B8472" stroke-width="2" stroke-dasharray="4,3"/>
+  <polygon points="500,262 495,252 505,252" fill="#6B8472"/>
+
+  <!-- PRODUCTORES + PARCELAS (lado a lado) -->
+  <!-- Productores -->
+  <rect x="160" y="268" width="240" height="90" rx="12" fill="#FFFFFF" stroke="#6B8472" stroke-width="2"/>
+  <rect x="160" y="268" width="240" height="28" rx="12" fill="#6B8472"/>
+  <rect x="160" y="284" width="240" height="12" fill="#6B8472"/>
+  <text x="280" y="287" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="700" letter-spacing="1">PRODUCTORES</text>
+  <text x="280" y="306" text-anchor="middle" fill="#4A6A50" font-size="9.5">Nombre, documento, ubicación</text>
+  <text x="280" y="321" text-anchor="middle" fill="#4A6A50" font-size="9.5">Departamento / provincia / distrito</text>
+  <text x="280" y="336" text-anchor="middle" fill="#4A6A50" font-size="9.5">Tipo producto: café / cacao</text>
+  <text x="280" y="349" text-anchor="middle" fill="#7A9A7C" font-size="8.5" font-style="italic">GeoMaps · Evidencias · Familia</text>
+
+  <!-- Parcelas -->
+  <rect x="600" y="268" width="240" height="90" rx="12" fill="#FFFFFF" stroke="#8A9E8A" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <rect x="600" y="268" width="240" height="28" rx="12" fill="#8A9E8A"/>
+  <rect x="600" y="284" width="240" height="12" fill="#8A9E8A"/>
+  <text x="720" y="287" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="700" letter-spacing="1">PARCELAS</text>
+  <text x="720" y="306" text-anchor="middle" fill="#4A6A50" font-size="9.5">Hectáreas, altitud, cultivo</text>
+  <text x="720" y="321" text-anchor="middle" fill="#4A6A50" font-size="9.5">Asociadas a un productor</text>
+  <text x="720" y="336" text-anchor="middle" fill="#4A6A50" font-size="9.5">Opcionales en el lote</text>
+
+  <!-- Flecha campaña → productores (horizontal desde centro) -->
+  <line x1="380" y1="295" x2="400" y2="295" stroke="#6B8472" stroke-width="1.5"/>
+  <line x1="400" y1="263" x2="400" y2="295" stroke="#6B8472" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="384,295 394,290 394,300" fill="#6B8472"/>
+
+  <!-- Flecha productores → parcelas -->
+  <line x1="400" y1="313" x2="600" y2="313" stroke="#8A9E8A" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <polygon points="596,313 586,308 586,318" fill="#8A9E8A"/>
+
+
+  <!-- ─────────────────── FASE 2: ACOPIO ─────────────────── -->
+
+  <!-- Flecha productores → lotes -->
+  <line x1="280" y1="358" x2="280" y2="390" stroke="#7A8C9C" stroke-width="2" stroke-dasharray="4,3"/>
+  <line x1="280" y1="390" x2="500" y2="390" stroke="#7A8C9C" stroke-width="2" stroke-dasharray="4,3"/>
+  <line x1="500" y1="390" x2="500" y2="368" stroke="#7A8C9C" stroke-width="2" stroke-dasharray="4,3"/>
+  <polygon points="500,372 495,382 505,382" fill="#7A8C9C"/>
+
+  <!-- LOTES -->
+  <rect x="340" y="348" width="320" height="110" rx="12" fill="#FFFFFF" stroke="#7A8C9C" stroke-width="2"/>
+  <rect x="340" y="348" width="320" height="28" rx="12" fill="#7A8C9C"/>
+  <rect x="340" y="364" width="320" height="12" fill="#7A8C9C"/>
+  <text x="500" y="367" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="700" letter-spacing="1">LOTES (ACOPIO)</text>
+  <text x="500" y="387" text-anchor="middle" fill="#3A5070" font-size="9.5">Código, tipo producto, campaña</text>
+  <text x="500" y="402" text-anchor="middle" fill="#3A5070" font-size="9.5">Cantidad Kg · Sacos · Variedad</text>
+  <text x="500" y="417" text-anchor="middle" fill="#3A5070" font-size="9.5">Planta (almacén): CB Jaen, Kuska…</text>
+  <text x="500" y="432" text-anchor="middle" fill="#3A5070" font-size="9.5">Fecha adquisición · Estado</text>
+  <text x="500" y="448" text-anchor="middle" fill="#7A9A7C" font-size="8.5" font-style="italic">Estados: PRE_ADQUISICION → PREPARADO</text>
+
+  <!-- Flecha lotes → muestras -->
+  <line x1="500" y1="458" x2="500" y2="490" stroke="#7A8C9C" stroke-width="2" stroke-dasharray="4,3"/>
+  <polygon points="500,494 495,484 505,484" fill="#7A8C9C"/>
+
+  <!-- MUESTRAS -->
+  <rect x="200" y="494" width="260" height="110" rx="12" fill="#FFFFFF" stroke="#7A8C9C" stroke-width="2"/>
+  <rect x="200" y="494" width="260" height="28" rx="12" fill="#7A8C9C"/>
+  <rect x="200" y="510" width="260" height="12" fill="#7A8C9C"/>
+  <text x="330" y="513" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="700" letter-spacing="1">MUESTRAS</text>
+  <text x="330" y="532" text-anchor="middle" fill="#3A5070" font-size="9.5">Código único por muestra</text>
+  <text x="330" y="547" text-anchor="middle" fill="#3A5070" font-size="9.5">Rendimiento · Humedad</text>
+  <text x="330" y="562" text-anchor="middle" fill="#3A5070" font-size="9.5">Variedad · Proceso (lavado/natural)</text>
+  <text x="330" y="577" text-anchor="middle" fill="#3A5070" font-size="9.5">Planta · Fecha registro</text>
+  <text x="330" y="592" text-anchor="middle" fill="#7A9A7C" font-size="8.5" font-style="italic">Estado: pendiente → completada</text>
+
+  <!-- EVALUACIONES (derecha de muestras) -->
+  <rect x="540" y="494" width="220" height="50" rx="10" fill="#FFFFFF" stroke="#8A9E8A" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="650" y="514" text-anchor="middle" fill="#4A6A50" font-size="10" font-weight="700">Evaluación Física</text>
+  <text x="650" y="530" text-anchor="middle" fill="#7A9A7C" font-size="9">Defectos, humedad, mermas</text>
+
+  <rect x="540" y="554" width="220" height="50" rx="10" fill="#FFFFFF" stroke="#8A9E8A" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="650" y="574" text-anchor="middle" fill="#4A6A50" font-size="10" font-weight="700">Evaluación Sensorial</text>
+  <text x="650" y="590" text-anchor="middle" fill="#7A9A7C" font-size="9">Fragancia, acidez, cuerpo, puntaje</text>
+
+  <!-- Flecha muestras → evaluaciones -->
+  <line x1="460" y1="519" x2="540" y2="519" stroke="#8A9E8A" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="536,519 526,514 526,524" fill="#8A9E8A"/>
+  <line x1="460" y1="579" x2="540" y2="579" stroke="#8A9E8A" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="536,579 526,574 526,584" fill="#8A9E8A"/>
+
+
+  <!-- ─────────────────── FASE 3: PROCESO ─────────────────── -->
+
+  <!-- Flecha lotes → lotes finales -->
+  <line x1="500" y1="458" x2="500" y2="690" stroke="#9C8468" stroke-width="2.5"/>
+  <!-- se ve oculta por muestras, ponemos una curva -->
+  <path d="M500,458 L500,680" stroke="#9C8468" stroke-width="2.5" fill="none" stroke-dasharray="6,3"/>
+  <polygon points="500,686 495,676 505,676" fill="#9C8468"/>
+
+  <!-- LOTES FINALES -->
+  <rect x="310" y="686" width="380" height="110" rx="12" fill="#FFFFFF" stroke="#9C8468" stroke-width="2.5"/>
+  <rect x="310" y="686" width="380" height="28" rx="12" fill="#9C8468"/>
+  <rect x="310" y="702" width="380" height="12" fill="#9C8468"/>
+  <text x="500" y="705" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="700" letter-spacing="1">LOTES FINALES</text>
+  <text x="500" y="725" text-anchor="middle" fill="#5A4A30" font-size="9.5">Código LF-YYYY-NNNN</text>
+  <text x="500" y="740" text-anchor="middle" fill="#5A4A30" font-size="9.5">Tipo origen: MEZCLA · DIRECTO · DIVISIÓN</text>
+  <text x="500" y="755" text-anchor="middle" fill="#5A4A30" font-size="9.5">Lote(s) origen con kg aportados</text>
+  <text x="500" y="770" text-anchor="middle" fill="#5A4A30" font-size="9.5">Estado: PENDIENTE_TRILLADO → TRILLADO → VENDIDO</text>
+  <text x="500" y="785" text-anchor="middle" fill="#9C8468" font-size="8.5" font-style="italic">Múltiples lotes origen pueden componer un lote final</text>
+
+  <!-- Flecha lote final → trillado -->
+  <line x1="500" y1="796" x2="500" y2="826" stroke="#9C8468" stroke-width="2" stroke-dasharray="4,3"/>
+  <polygon points="500,830 495,820 505,820" fill="#9C8468"/>
+
+  <!-- TRILLADO + MERMAS -->
+  <rect x="200" y="830" width="270" height="100" rx="12" fill="#FFFFFF" stroke="#9C8468" stroke-width="2"/>
+  <rect x="200" y="830" width="270" height="28" rx="12" fill="#9C8468"/>
+  <rect x="200" y="846" width="270" height="12" fill="#9C8468"/>
+  <text x="335" y="849" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="700" letter-spacing="1">TRILLADO</text>
+  <text x="335" y="869" text-anchor="middle" fill="#5A4A30" font-size="9.5">Pergamino → Oro verde</text>
+  <text x="335" y="884" text-anchor="middle" fill="#5A4A30" font-size="9.5">Planta, malla, tipo selección</text>
+  <text x="335" y="899" text-anchor="middle" fill="#5A4A30" font-size="9.5">Quintales, kg sueltos</text>
+  <text x="335" y="914" text-anchor="middle" fill="#9C8468" font-size="8.5" font-style="italic">Rendimiento = kg oro / kg pergamino</text>
+
+  <!-- MERMAS -->
+  <rect x="560" y="830" width="220" height="100" rx="12" fill="#FFFFFF" stroke="#A09078" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <rect x="560" y="830" width="220" height="28" rx="12" fill="#A09078"/>
+  <rect x="560" y="846" width="220" height="12" fill="#A09078"/>
+  <text x="670" y="849" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="700" letter-spacing="1">MERMAS</text>
+  <text x="670" y="869" text-anchor="middle" fill="#5A4A30" font-size="9.5">Reutilizable (LR)</text>
+  <text x="670" y="884" text-anchor="middle" fill="#5A4A30" font-size="9.5">Desechable (LD)</text>
+  <text x="670" y="899" text-anchor="middle" fill="#5A4A30" font-size="9.5">Exportable (sobrante)</text>
+  <text x="670" y="914" text-anchor="middle" fill="#A09078" font-size="8.5" font-style="italic">Asociadas al trillado</text>
+
+  <!-- Flecha trillado → mermas -->
+  <line x1="470" y1="880" x2="560" y2="880" stroke="#A09078" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="556,880 546,875 546,885" fill="#A09078"/>
+
+  <!-- MOVIMIENTOS CADEX / KARDEX -->
+  <rect x="340" y="952" width="320" height="80" rx="12" fill="#FFFFFF" stroke="#7A8C9C" stroke-width="1.5"/>
+  <rect x="340" y="952" width="320" height="28" rx="12" fill="#7A8C9C"/>
+  <rect x="340" y="968" width="320" height="12" fill="#7A8C9C"/>
+  <text x="500" y="971" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="700" letter-spacing="1">KARDEX / MOVIMIENTOS CADEX</text>
+  <text x="500" y="991" text-anchor="middle" fill="#3A5070" font-size="9.5">INGRESO · MERMA · SALIDA</text>
+  <text x="500" y="1006" text-anchor="middle" fill="#3A5070" font-size="9.5">Saldo en tiempo real por lote final</text>
+  <text x="500" y="1021" text-anchor="middle" fill="#7A9A7C" font-size="8.5" font-style="italic">Refs: AJUSTE · TRILLADO · PREVENTA_MUESTRA · VENTA</text>
+
+  <!-- Flecha trillado → kardex -->
+  <line x1="335" y1="930" x2="335" y2="966" stroke="#7A8C9C" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="335" y1="966" x2="340" y2="966" stroke="#7A8C9C" stroke-width="1.5"/>
+  <polygon points="344,966 334,961 334,971" fill="#7A8C9C"/>
+
+
+  <!-- ─────────────────── FASE 4: VENTAS ─────────────────── -->
+
+  <!-- Flecha kardex → gestión -->
+  <line x1="500" y1="1032" x2="500" y2="1060" stroke="#6B8472" stroke-width="2" stroke-dasharray="4,3"/>
+  <polygon points="500,1064 495,1054 505,1054" fill="#6B8472"/>
+
+  <!-- ORDEN DE VENTA -->
+  <rect x="280" y="1064" width="440" height="80" rx="12" fill="#FFFFFF" stroke="#6B8472" stroke-width="2.5"/>
+  <rect x="280" y="1064" width="440" height="28" rx="12" fill="#6B8472"/>
+  <rect x="280" y="1080" width="440" height="12" fill="#6B8472"/>
+  <text x="500" y="1083" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="700" letter-spacing="1">ORDEN DE VENTA</text>
+  <text x="500" y="1103" text-anchor="middle" fill="#3A5A40" font-size="9.5">Cliente · Lote final · Kg · Precio (USD / PEN)</text>
+  <text x="500" y="1118" text-anchor="middle" fill="#3A5A40" font-size="9.5">Destino · Tipo producto · Fecha</text>
+  <text x="500" y="1133" text-anchor="middle" fill="#7A9A7C" font-size="8.5" font-style="italic">Cotizaciones · Compromisos de compra</text>
+
+  <!-- PIPELINE DE ETAPAS -->
+  <!-- Flecha orden → pipeline -->
+  <line x1="500" y1="1144" x2="500" y2="1170" stroke="#6B8472" stroke-width="2" stroke-dasharray="4,3"/>
+  <polygon points="500,1174 495,1164 505,1164" fill="#6B8472"/>
+
+  <!-- Etapa 1: Preventa -->
+  <rect x="40" y="1174" width="190" height="100" rx="10" fill="#FFFFFF" stroke="#8A9CB0" stroke-width="2"/>
+  <rect x="40" y="1174" width="190" height="26" rx="10" fill="#8A9CB0"/>
+  <rect x="40" y="1188" width="190" height="10" fill="#8A9CB0"/>
+  <text x="135" y="1191" text-anchor="middle" fill="#FFFFFF" font-size="10" font-weight="700">1. PREVENTA</text>
+  <text x="135" y="1210" text-anchor="middle" fill="#3A5070" font-size="9">Muestras a clientes</text>
+  <text x="135" y="1225" text-anchor="middle" fill="#3A5070" font-size="9">Negociación de precio</text>
+  <text x="135" y="1240" text-anchor="middle" fill="#3A5070" font-size="9">Cotizaciones</text>
+  <text x="135" y="1262" text-anchor="middle" fill="#8A9CB0" font-size="8" font-style="italic">Salida muestra del CADEX</text>
+
+  <!-- Flecha preventa → alistado -->
+  <line x1="230" y1="1224" x2="262" y2="1224" stroke="#9C8468" stroke-width="2"/>
+  <polygon points="260,1224 250,1219 250,1229" fill="#9C8468"/>
+
+  <!-- Etapa 2: Alistado -->
+  <rect x="262" y="1174" width="190" height="100" rx="10" fill="#FFFFFF" stroke="#9C8468" stroke-width="2"/>
+  <rect x="262" y="1174" width="190" height="26" rx="10" fill="#9C8468"/>
+  <rect x="262" y="1188" width="190" height="10" fill="#9C8468"/>
+  <text x="357" y="1191" text-anchor="middle" fill="#FFFFFF" font-size="10" font-weight="700">2. ALISTADO</text>
+  <text x="357" y="1210" text-anchor="middle" fill="#5A4A30" font-size="9">Preparar sacos / bultos</text>
+  <text x="357" y="1225" text-anchor="middle" fill="#5A4A30" font-size="9">Documentos de exportación</text>
+  <text x="357" y="1240" text-anchor="middle" fill="#5A4A30" font-size="9">Pasos y responsables</text>
+  <text x="357" y="1262" text-anchor="middle" fill="#9C8468" font-size="8" font-style="italic">Timeline de avance</text>
+
+  <!-- Flecha alistado → exportacion -->
+  <line x1="452" y1="1224" x2="484" y2="1224" stroke="#7A8C9C" stroke-width="2"/>
+  <polygon points="482,1224 472,1219 472,1229" fill="#7A8C9C"/>
+
+  <!-- Etapa 3: Exportación -->
+  <rect x="484" y="1174" width="190" height="100" rx="10" fill="#FFFFFF" stroke="#7A8C9C" stroke-width="2"/>
+  <rect x="484" y="1174" width="190" height="26" rx="10" fill="#7A8C9C"/>
+  <rect x="484" y="1188" width="190" height="10" fill="#7A8C9C"/>
+  <text x="579" y="1191" text-anchor="middle" fill="#FFFFFF" font-size="10" font-weight="700">3. EXPORTACIÓN</text>
+  <text x="579" y="1210" text-anchor="middle" fill="#3A5070" font-size="9">Embarque / BL / DUA</text>
+  <text x="579" y="1225" text-anchor="middle" fill="#3A5070" font-size="9">Fecha embarque</text>
+  <text x="579" y="1240" text-anchor="middle" fill="#3A5070" font-size="9">Destino internacional</text>
+  <text x="579" y="1262" text-anchor="middle" fill="#7A8C9C" font-size="8" font-style="italic">Salida definitiva CADEX</text>
+
+  <!-- Flecha exportacion → post_venta -->
+  <line x1="674" y1="1224" x2="706" y2="1224" stroke="#6B8472" stroke-width="2"/>
+  <polygon points="704,1224 694,1219 694,1229" fill="#6B8472"/>
+
+  <!-- Etapa 4: Post Venta -->
+  <rect x="706" y="1174" width="254" height="100" rx="10" fill="#FFFFFF" stroke="#6B8472" stroke-width="2"/>
+  <rect x="706" y="1174" width="254" height="26" rx="10" fill="#6B8472"/>
+  <rect x="706" y="1188" width="254" height="10" fill="#6B8472"/>
+  <text x="833" y="1191" text-anchor="middle" fill="#FFFFFF" font-size="10" font-weight="700">4. POST VENTA</text>
+  <text x="833" y="1210" text-anchor="middle" fill="#3A5A40" font-size="9">Confirmación de pago</text>
+  <text x="833" y="1225" text-anchor="middle" fill="#3A5A40" font-size="9">Documentos finales</text>
+  <text x="833" y="1240" text-anchor="middle" fill="#3A5A40" font-size="9">Cierre de orden</text>
+  <text x="833" y="1262" text-anchor="middle" fill="#6B8472" font-size="8" font-style="italic">Orden → estado COMPLETADO</text>
+
+
+  <!-- ─────────────────── FASE 5: INDICADORES ─────────────────── -->
+
+  <!-- Flecha post_venta → dashboard -->
+  <line x1="500" y1="1274" x2="500" y2="1340" stroke="#283F34" stroke-width="2" stroke-dasharray="5,3"/>
+  <polygon points="500,1344 495,1334 505,1334" fill="#283F34"/>
+
+  <!-- DASHBOARD -->
+  <rect x="250" y="1340" width="500" height="60" rx="12" fill="#283F34"/>
+  <text x="500" y="1366" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="700" letter-spacing="1">DASHBOARD DE INDICADORES</text>
+  <text x="500" y="1386" text-anchor="middle" fill="#A8C8A8" font-size="9.5">Acopio · Trilla · Ventas · KPIs en tiempo real</text>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- LEYENDA -->
+  <!-- ══════════════════════════════════════════════ -->
+  <rect x="20" y="1145" width="240" height="100" rx="8" fill="#FFFFFF" stroke="#D0D8D0" stroke-width="1"/>
+  <text x="35" y="1165" fill="#3A5A40" font-size="9" font-weight="700" letter-spacing="1">LEYENDA</text>
+  <rect x="35" y="1173" width="14" height="10" rx="2" fill="#6B8472"/>
+  <text x="55" y="1183" fill="#555" font-size="9">Módulo principal</text>
+  <rect x="35" y="1191" width="14" height="10" rx="2" fill="#FFFFFF" stroke="#8A9E8A" stroke-width="1.5"/>
+  <line x1="35" y1="1196" x2="49" y2="1196" stroke="#8A9E8A" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <text x="55" y="1201" fill="#555" font-size="9">Módulo complementario</text>
+  <line x1="35" y1="1214" x2="60" y2="1214" stroke="#7A8C9C" stroke-width="2"/>
+  <polygon points="58,1214 50,1210 50,1218" fill="#7A8C9C"/>
+  <text x="65" y="1218" fill="#555" font-size="9">Flujo obligatorio</text>
+  <line x1="35" y1="1232" x2="60" y2="1232" stroke="#8A9E8A" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="58,1232 50,1228 50,1236" fill="#8A9E8A"/>
+  <text x="65" y="1236" fill="#555" font-size="9">Flujo opcional</text>
+
+  <!-- Footer -->
+  <text x="500" y="1412" text-anchor="middle" fill="#9A9A9A" font-size="8">Collective Bean · Intipampa ERP · Flujo de Gestión v1</text>
+
+</svg>

@@ -221,6 +221,7 @@ interface ReportContentProps {
 export type { ReportContentProps };
 export function ReportContent({ productor, familiares, parcelas, evidencias, evidenciasFamiliares, imageBlobUrls, familiarBlobUrls, pdfBlobUrls, familiarPdfBlobUrls, printDate, forExport }: ReportContentProps) {
   const hijos = parseHijos(productor.hijosData);
+  const esEmpresa = (productor.nroDocumento?.length === 11) || !!productor.empresaTipo;
 
   return (
     <div id="productor-export-content" style={{ fontFamily: 'system-ui, sans-serif', color: '#111827', lineHeight: 1.4, maxWidth: '780px', margin: '0 auto', padding: '0 8px' }}>
@@ -276,52 +277,84 @@ export function ReportContent({ productor, familiares, parcelas, evidencias, evi
         </div>
       </Section>
 
-      <Section title="Información familiar">
-        <div>
-          <Row label="Nombre en núcleo familiar" value={productor.familiarNombreProductor} half />
-          <Row label="Edad" value={fmtNum(productor.familiarEdadProductor, ' años')} half />
-          <Row label="Estado civil" value={productor.familiarEstadoCivil} half />
-          <Row label="Grado de instrucción" value={productor.familiarGradoInstruccion} half />
-        </div>
-
-        {(productor.conyugeNombre || productor.conyugeEdad) && (
-          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #f3f4f6' }}>
-            <div style={{ fontSize: '9px', fontWeight: 700, color: '#374151', marginBottom: '6px', textTransform: 'uppercase' }}>Cónyuge / Pareja</div>
-            <Row label="Nombre" value={productor.conyugeNombre} half />
-            <Row label="Edad" value={fmtNum(productor.conyugeEdad, ' años')} half />
-            <Row label="Ocupación" value={productor.conyugeOcupacion} half />
-            <Row label="Grado de instrucción" value={productor.conyugeGradoInstruccion} half />
+      {esEmpresa ? (
+        <Section title="Información de la empresa">
+          <div>
+            <Row label="Tipo de empresa"           value={productor.empresaTipo} half />
+            <Row label="Nombre comercial"          value={productor.empresaNombreComercial} half />
+            <Row label="Gerente General"           value={productor.empresaGerenteGeneral} half />
+            <Row label="Acopiador responsable"     value={productor.empresaAcopiador} half />
+            <Row label="Fecha de inicio"            value={productor.empresaAnioInicio ? new Date(productor.empresaAnioInicio + 'T00:00:00').toLocaleDateString('es-PE') : '—'} half />
+            <Row label="Cantidad de trabajadores"  value={fmtNum(productor.empresaCantTrabajadores)} half />
+            {productor.empresaInfoLegal  && <Row label="Información legal (SUNARP)" value={productor.empresaInfoLegal} />}
+            {productor.empresaInfoSunat  && <Row label="Información SUNAT"          value={productor.empresaInfoSunat} />}
           </div>
-        )}
-
-        {hijos.length > 0 && (
           <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #f3f4f6' }}>
-            <div style={{ fontSize: '9px', fontWeight: 700, color: '#374151', marginBottom: '6px', textTransform: 'uppercase' }}>Hijos ({hijos.length})</div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f9fafb' }}>
-                  <th style={thStyle}>Nombre</th>
-                  <th style={thStyle}>Edad</th>
-                  <th style={thStyle}>Nivel estudios</th>
-                  <th style={thStyle}>Escolarizado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hijos.map((h, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={tdStyle}>{h.nombre || '—'}</td>
-                    <td style={tdStyle}>{h.edad ? `${h.edad} años` : '—'}</td>
-                    <td style={tdStyle}>{h.nivelEstudios || '—'}</td>
-                    <td style={tdStyle}>{h.escolarizado === true ? 'Sí' : h.escolarizado === false ? 'No' : '—'}</td>
+            <div style={{ fontSize: '9px', fontWeight: 700, color: '#374151', marginBottom: '6px', textTransform: 'uppercase' }}>Situación SUNAT y cumplimiento</div>
+            <Row label="Registrado en SUNAT"          value={bool(productor.registradoSunat)} half />
+            <Row label="Activo en SUNAT"              value={bool(productor.activoSunat)} half />
+            <Row label="Declaró impuestos año previo" value={bool(productor.declaroImpuestosPrevios)} half />
+            <Row label="Certificaciones"              value={productor.certificaciones} half />
+            <Row label="Políticas internas"           value={bool(productor.cuentaConPoliticas)} half />
+            {productor.cuentaConPoliticas && productor.cualesPoliticas && <Row label="Cuáles políticas" value={productor.cualesPoliticas} />}
+            <Row label="Registros y gestión de datos" value={productor.registrosGestionDatos} half />
+            <Row label="Trabajadores en regla SUNAFIL" value={bool(productor.trabajadoresReglaSunafil)} half />
+            <Row label="Denuncias de usurpación"      value={bool(productor.denunciasUsurpacion)} half />
+            {productor.denunciasUsurpacion && productor.cualesUsurpacion && <Row label="Detalle usurpación" value={productor.cualesUsurpacion} />}
+            <Row label="Denuncias de corrupción"      value={bool(productor.denunciasCorrupcion)} half />
+            {productor.denunciasCorrupcion && productor.cualesCorrupcion && <Row label="Detalle corrupción" value={productor.cualesCorrupcion} />}
+            <Row label="Incidencias en visita"        value={bool(productor.incidenciasVisita)} half />
+            {productor.incidenciasVisita && productor.cualesIncidencias && <Row label="Detalle incidencias" value={productor.cualesIncidencias} />}
+          </div>
+        </Section>
+      ) : (
+        <Section title="Información familiar">
+          <div>
+            <Row label="Nombre en núcleo familiar" value={productor.familiarNombreProductor} half />
+            <Row label="Edad" value={fmtNum(productor.familiarEdadProductor, ' años')} half />
+            <Row label="Estado civil" value={productor.familiarEstadoCivil} half />
+            <Row label="Grado de instrucción" value={productor.familiarGradoInstruccion} half />
+          </div>
+
+          {(productor.conyugeNombre || productor.conyugeEdad) && (
+            <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #f3f4f6' }}>
+              <div style={{ fontSize: '9px', fontWeight: 700, color: '#374151', marginBottom: '6px', textTransform: 'uppercase' }}>Cónyuge / Pareja</div>
+              <Row label="Nombre" value={productor.conyugeNombre} half />
+              <Row label="Edad" value={fmtNum(productor.conyugeEdad, ' años')} half />
+              <Row label="Ocupación" value={productor.conyugeOcupacion} half />
+              <Row label="Grado de instrucción" value={productor.conyugeGradoInstruccion} half />
+            </div>
+          )}
+
+          {hijos.length > 0 && (
+            <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #f3f4f6' }}>
+              <div style={{ fontSize: '9px', fontWeight: 700, color: '#374151', marginBottom: '6px', textTransform: 'uppercase' }}>Hijos ({hijos.length})</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f9fafb' }}>
+                    <th style={thStyle}>Nombre</th>
+                    <th style={thStyle}>Edad</th>
+                    <th style={thStyle}>Nivel estudios</th>
+                    <th style={thStyle}>Escolarizado</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Section>
+                </thead>
+                <tbody>
+                  {hijos.map((h, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={tdStyle}>{h.nombre || '—'}</td>
+                      <td style={tdStyle}>{h.edad ? `${h.edad} años` : '—'}</td>
+                      <td style={tdStyle}>{h.nivelEstudios || '—'}</td>
+                      <td style={tdStyle}>{h.escolarizado === true ? 'Sí' : h.escolarizado === false ? 'No' : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
+      )}
 
-      <Section title="Salud y servicios básicos">
+      {!esEmpresa && <Section title="Salud y servicios básicos">
         <div>
           <Row label="Seguro médico" value={productor.seguroMedico} half />
           <Row label="Enfermedad especial" value={bool(productor.tieneEnfermedadEspecial)} half />
@@ -342,7 +375,7 @@ export function ReportContent({ productor, familiares, parcelas, evidencias, evi
             </div>
           ))}
         </div>
-      </Section>
+      </Section>}
 
       {familiares.length > 0 && (
         <Section title={`Familiares registrados (${familiares.length})`}>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import LoadingLogo from '@/components/LoadingLogo';
 import { useToast } from '@/contexts/ToastContext';
 import { lotesFinalesService, LoteFinal } from '@/services/lotes-finales.service';
+import { clientesService, Cliente } from '@/services/clientes.service';
 import type { LucideIcon } from 'lucide-react';
 import {
   Plus, Search, Pencil, Trash2, Package, CheckCircle2, Ship,
@@ -283,9 +284,29 @@ function OrdenModal({ initial, onClose, onSave }: { initial?: OrdenOp | null; on
   const [venderTodo,   setVenderTodo]   = useState(false);
   const autoTp = useRef(false);
 
+  const [clientes,            setClientes]            = useState<Cliente[]>([]);
+  const [clienteSearch,       setClienteSearch]       = useState('');
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
+  const [showClienteDrop,     setShowClienteDrop]     = useState(false);
+
   useEffect(() => {
     lotesFinalesService.getPage({ limit: 200 } as never).then(r => setLotes(r.data));
+    clientesService.getPage(1, 200).then(r => setClientes(r.data));
   }, []);
+
+  useEffect(() => {
+    if (initial?.cliente && clientes.length > 0) {
+      const found = clientes.find(c => c.nombre === initial.cliente);
+      if (found) setClienteSeleccionado(found);
+    }
+  }, [initial, clientes]);
+
+  const clientesFiltrados = clienteSearch.trim()
+    ? clientes.filter(c =>
+        c.nombre.toLowerCase().includes(clienteSearch.toLowerCase()) ||
+        (c.nroDocumento ?? '').includes(clienteSearch)
+      )
+    : clientes;
 
   const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(f => ({ ...f, [k]: v }));
 
@@ -316,7 +337,59 @@ function OrdenModal({ initial, onClose, onSave }: { initial?: OrdenOp | null; on
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Cliente</label>
-              <input value={form.cliente} onChange={e => set('cliente', e.target.value)} className={INP} placeholder="Razón social del cliente…" />
+              {clienteSeleccionado ? (
+                <div className="flex items-center gap-2 border border-gray-300 rounded-xl px-3 py-2.5 bg-gray-50">
+                  <User size={14} className="text-gray-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-800 truncate">{clienteSeleccionado.nombre}</p>
+                    <p className="text-[0.65rem] text-gray-400 font-mono">
+                      {[clienteSeleccionado.nroDocumento, clienteSeleccionado.pais].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                  {!initial && (
+                    <button
+                      type="button"
+                      onClick={() => { setClienteSeleccionado(null); set('cliente', ''); setClienteSearch(''); }}
+                      className="shrink-0 p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      title="Cambiar cliente"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    value={clienteSearch}
+                    onChange={e => { setClienteSearch(e.target.value); setShowClienteDrop(true); }}
+                    onFocus={() => setShowClienteDrop(true)}
+                    onBlur={() => setTimeout(() => setShowClienteDrop(false), 150)}
+                    placeholder="Buscar cliente registrado…"
+                    className={INP}
+                    autoComplete="off"
+                  />
+                  {showClienteDrop && clientesFiltrados.length > 0 && (
+                    <div className="absolute z-20 w-full top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" style={{ maxHeight: 200, overflowY: 'auto' }}>
+                      {clientesFiltrados.slice(0, 8).map(c => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onMouseDown={() => {
+                            setClienteSeleccionado(c);
+                            setForm(f => ({ ...f, cliente: c.nombre, destino: c.pais ?? f.destino }));
+                            setClienteSearch('');
+                            setShowClienteDrop(false);
+                          }}
+                          className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                        >
+                          <p className="text-sm font-semibold text-gray-800">{c.nombre}</p>
+                          {c.nroDocumento && <p className="text-[0.65rem] text-gray-400 font-mono">{c.nroDocumento}{c.pais ? ` · ${c.pais}` : ''}</p>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Campaña</label>
@@ -404,10 +477,6 @@ function OrdenModal({ initial, onClose, onSave }: { initial?: OrdenOp | null; on
                 className={INP}
                 placeholder="Auto desde lote o escribe…"
               />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Destino</label>
-              <input value={form.destino} onChange={e => set('destino', e.target.value)} className={INP} placeholder="País destino…" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Estado</label>

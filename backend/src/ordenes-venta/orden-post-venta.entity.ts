@@ -90,6 +90,22 @@ export class OrdenPostVenta {
   @Column({ type: 'text', nullable: true })
   observReclamo: string | null;
 
+  // ── Importación ───────────────────────────────────────────────────────────────
+  @Column({ length: 200, nullable: true })
+  agenteAduanaCliente: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  fechaLlegada: string | null;
+
+  @Column({ length: 150, nullable: true })
+  puertoLlegada: string | null;
+
+  @Column({ default: false })
+  inspeccionDestino: boolean;
+
+  @Column({ type: 'jsonb', nullable: true })
+  filesMapPostVenta: Record<string, { name: string; file: string }[]> | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

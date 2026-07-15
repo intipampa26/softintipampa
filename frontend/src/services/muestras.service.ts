@@ -2,9 +2,10 @@ import api from '@/api/axios';
 import { syncService } from './sync.service';
 import { storageService } from './storage.service';
 
-export type TipoMuestra        = 'cafe' | 'cacao';
+export type TipoMuestra        = 'pergamino' | 'oro' | 'grano_cacao';
 export type TipoProductoMuestra = 'cafe' | 'cacao' | 'cafe_cacao';
 export type EstadoMuestra      = 'pendiente' | 'en_proceso' | 'completada';
+export type ResultadoMuestra   = 'aprobado' | 'descartado';
 
 export interface Muestra {
   id: number;
@@ -12,7 +13,7 @@ export interface Muestra {
   fecha: string | null;
   tipoMuestra: TipoMuestra | null;
   estado: EstadoMuestra;
-  resultado: string | null;
+  resultado: ResultadoMuestra | null;
    
   puntaje: number | null;
   puntajeFisico:    number | string | null;
@@ -83,7 +84,7 @@ export interface CreateMuestraDto {
   tipoMuestra?: TipoMuestra;
   tipoProducto?: TipoProductoMuestra;
   estado?: EstadoMuestra;
-  resultado?: string;
+  resultado?: ResultadoMuestra;
   puntaje?: number;
   observaciones?: string;
   
@@ -106,9 +107,9 @@ export interface CreateMuestraDto {
 export interface FilterMuestrasDto {
   page?: number; limit?: number;
   campanaId?: number; productorId?: number; loteId?: number;
-  tipoMuestra?: TipoMuestra; estado?: EstadoMuestra; search?: string;
-  fechaDesde?: string; fechaHasta?: string;
-  estadoLote?: string; variedad?: string;
+  tipoMuestra?: TipoMuestra; estado?: EstadoMuestra; resultado?: ResultadoMuestra;
+  search?: string; fechaDesde?: string; fechaHasta?: string;
+  estadoLote?: string; variedad?: string; sinLote?: boolean;
 }
 
 export interface PaginationMeta { total: number; page: number; lastPage: number; limit: number; }

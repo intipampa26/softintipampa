@@ -134,7 +134,7 @@ export class CreateProductorDto {
 
   @IsString() @IsOptional() @MaxLength(100) empresaTipo?: string;
   @IsString() @IsOptional() @MaxLength(200) empresaGerenteGeneral?: string;
-  @IsInt()    @IsOptional() @Type(() => Number) empresaAnioInicio?: number;
+  @IsString() @IsOptional() @MaxLength(10)      empresaAnioInicio?: string;
   @IsString() @IsOptional() empresaInfoLegal?: string;
   @IsString() @IsOptional() @MaxLength(200) empresaNombreComercial?: string;
   @IsString() @IsOptional() @MaxLength(200) empresaAcopiador?: string;

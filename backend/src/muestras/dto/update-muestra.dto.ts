@@ -1,6 +1,6 @@
 import { IsBoolean, IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { EstadoMuestra } from '../muestra.entity';
+import { EstadoMuestra, ResultadoMuestra, TipoMuestraProducto } from '../muestra.entity';
 
 export class UpdateMuestraDto {
   @IsInt() @Min(1) @IsOptional() productorId?: number;
@@ -10,7 +10,8 @@ export class UpdateMuestraDto {
   @IsInt() @Min(1) @IsOptional() parcelaId?: number;
   @IsNumber() @Min(0) @IsOptional() @Type(() => Number) cantidadKg?: number;
   @IsDateString() @IsOptional() fechaRegistro?: string;
-  @IsString() @IsOptional() @MaxLength(100) tipoMuestra?: string;
+  @IsEnum(TipoMuestraProducto) @IsOptional() tipoMuestra?: TipoMuestraProducto;
+  @IsEnum(ResultadoMuestra)    @IsOptional() resultado?: ResultadoMuestra;
   @IsNumber() @Min(0) @IsOptional() @Type(() => Number) rendimiento?: number;
   @IsNumber() @Min(0) @Max(100) @IsOptional() @Type(() => Number) humedad?: number;
   @IsString() @IsOptional() @MaxLength(200) base?: string;
