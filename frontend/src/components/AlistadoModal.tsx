@@ -225,7 +225,7 @@ export function AlistadoModal({ orden, initialTab = 'compromiso', onClose }: Pro
         setLotesResultados(data);
       } catch { /* silencioso */ }
       finally { setLoadingLotes(false); }
-    }, 5000);
+    }, 300);
     return () => { if (debounceRefLotes.current) clearTimeout(debounceRefLotes.current); };
   }, [lotesSearch, lotesFilterProductor, lotesFilterSku, campanaIdLotes, productoresLotes]);
 

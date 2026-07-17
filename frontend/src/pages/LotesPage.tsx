@@ -14,8 +14,8 @@ import { useToast } from '@/contexts/ToastContext';
 
 const PLANTAS = ['CB JAEN','CB LIMA','EXPOCAFÉ','KUSKA','MEGO','SELVA NORTE','AICASA','NORANDINO','NEGRISA'];
 
-const POST_TRILLADO: LoteEstado[] = ['POST_TRILLADO', 'PREPARADO', 'EMBARCADO', 'EXPORTADO'];
-function subtipoCafe(estado: LoteEstado) { return POST_TRILLADO.includes(estado) ? 'Café Pergamino' : 'Café Oro Verde'; }
+const POST_ADQUISICION_STATES: LoteEstado[] = ['PRE_ALISTADO', 'PREPARADO', 'EMBARCADO', 'EXPORTADO'];
+function subtipoCafe(estado: LoteEstado) { return POST_ADQUISICION_STATES.includes(estado) ? 'Café Pergamino' : 'Café Oro Verde'; }
 function displaySubtipo(estado: LoteEstado, tp?: { tipo: string; subtipoEntrada: string }) {
   if (!tp) return '';
   return tp.tipo === 'CAFE' ? subtipoCafe(estado) : tp.subtipoEntrada.replace(/_/g, ' ');
@@ -60,22 +60,18 @@ function VariedadSelect({ value, onChange, variedades, placeholder = 'Sin varied
 }
 
 const ESTADO_LABEL: Record<LoteEstado, string> = {
-  PRE_ADQUISICION:  'Pre Adquisición',
-  POST_ADQUISICION: 'Post Adquisición',
-  PRE_TRILLADO:     'Pre Alistado',
-  POST_TRILLADO:    'Post Alistado',
-  PREPARADO:        'Preparado',
-  EMBARCADO:        'Embarcado',
-  EXPORTADO:        'Exportado',
+  PRE_ADQUISICION: 'Pre Adquisición',
+  PRE_ALISTADO:    'Pre Alistado',
+  PREPARADO:       'Preparado',
+  EMBARCADO:       'Embarcado',
+  EXPORTADO:       'Exportado',
 };
 const ESTADO_DOT: Record<LoteEstado, string> = {
-  PRE_ADQUISICION:  'bg-orange-400',
-  POST_ADQUISICION: 'bg-yellow-400',
-  PRE_TRILLADO:     'bg-amber-500',
-  POST_TRILLADO:    'bg-lime-500',
-  PREPARADO:        'bg-green-500',
-  EMBARCADO:        'bg-blue-500',
-  EXPORTADO:        'bg-indigo-600',
+  PRE_ADQUISICION: 'bg-orange-400',
+  PRE_ALISTADO:    'bg-amber-500',
+  PREPARADO:       'bg-green-500',
+  EMBARCADO:       'bg-blue-500',
+  EXPORTADO:       'bg-indigo-600',
 };
 
 function LoteFormModal({ tiposProducto, campanas, onClose, onSave, initial }: {
@@ -275,6 +271,170 @@ function DeleteConfirm({ lote, onClose, onConfirm }: { lote: Lote; onClose: () =
   );
 }
 
+function ExportarLotesModal({ onClose }: { onClose: () => void }) {
+  const [campanas,    setCampanas]    = useState<Campana[]>([]);
+  const [productores, setProductores] = useState<Productor[]>([]);
+  const [tiposProducto, setTiposProducto] = useState<TipoProducto[]>([]);
+  const [filterCampana,   setFilterCampana]   = useState('');
+  const [filterProductor, setFilterProductor] = useState('');
+  const [filterEstado,    setFilterEstado]    = useState<LoteEstado | ''>('');
+  const [filterTipo,      setFilterTipo]      = useState('');
+  const [rows, setRows] = useState<Lote[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  const toast = useToast();
+
+  useEffect(() => {
+    campanasService.getPage(1, 100).then(r => setCampanas(r.data));
+    productoresService.getPage(1, 200).then(r => setProductores(r.data));
+    tiposProductoService.getAll().then(setTiposProducto);
+  }, []);
+
+  async function handleBuscar() {
+    setLoading(true); setSearched(false);
+    try {
+      const filter: FilterLotesDto = { page: 1, limit: 500 };
+      if (filterCampana)   filter.campanaId      = Number(filterCampana);
+      if (filterProductor) filter.productorId    = Number(filterProductor);
+      if (filterEstado)    filter.estado         = filterEstado;
+      if (filterTipo)      filter.tipoProductoId = Number(filterTipo);
+      const result = await lotesService.getPage(filter);
+      setRows(result.data);
+      setSearched(true);
+    } catch { toast.error('Error al cargar datos.'); }
+    finally { setLoading(false); }
+  }
+
+  async function handleDescargar() {
+    if (!rows.length) return;
+    const XLSX = await import('xlsx');
+    const data = rows.map(l => ({
+      Código:            l.codigo,
+      Tipo:              l.tipoProducto?.tipo ?? '',
+      Estado:            ESTADO_LABEL[l.estado] ?? l.estado,
+      Campaña:           l.campana?.nombre ?? '',
+      Productor:         l.productor ? `${l.productor.nombre} ${l.productor.apellido ?? ''}`.trim() : '',
+      'Cantidad (kg)':   Number(l.cantidadKg).toFixed(3),
+      Sacos:             l.cantidadSacos ?? '',
+      Variedad:          l.variedad ?? '',
+      Planta:            l.planta ?? '',
+      'Fecha Adquisición': l.fechaAdquisicion ?? '',
+      Observaciones:     l.observaciones ?? '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Lotes');
+    XLSX.writeFile(wb, `lotes_${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+
+  const sel = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white';
+
+  return (
+    <div onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ position:'fixed', inset:0, zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:'1rem', backgroundColor:'rgba(0,0,0,0.55)' }}>
+      <div style={{ width:'100%', maxWidth:'72rem', maxHeight:'92vh', display:'flex', flexDirection:'column' }} className="bg-white rounded-2xl shadow-2xl">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="font-black text-gray-800 uppercase tracking-wide">Exportar Lotes</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Previsualiza y descarga los lotes filtrados en Excel</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div className="px-6 py-4 border-b border-gray-100 shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1">Campaña</label>
+              <select value={filterCampana} onChange={e => setFilterCampana(e.target.value)} className={sel}>
+                <option value="">Todas</option>
+                {campanas.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1">Tipo</label>
+              <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)} className={sel}>
+                <option value="">Todos</option>
+                {tiposProducto.map(t => <option key={t.id} value={t.id}>{t.tipo}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1">Productor</label>
+              <select value={filterProductor} onChange={e => setFilterProductor(e.target.value)} className={sel}>
+                <option value="">Todos</option>
+                {productores.map(p => <option key={p.id} value={p.id}>{p.nombre} {p.apellido ?? ''}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1">Estado</label>
+              <select value={filterEstado} onChange={e => setFilterEstado(e.target.value as LoteEstado | '')} className={sel}>
+                <option value="">Todos</option>
+                {(['PRE_ADQUISICION','PRE_ALISTADO','PREPARADO','EMBARCADO','EXPORTADO'] as LoteEstado[]).map(e => (
+                  <option key={e} value={e}>{ESTADO_LABEL[e]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button onClick={handleBuscar} disabled={loading}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-50"
+              style={{ backgroundColor: '#1A2B23' }}>
+              {loading ? 'Cargando…' : 'Buscar'}
+            </button>
+            {searched && rows.length > 0 && (
+              <button onClick={handleDescargar}
+                className="px-4 py-2 rounded-xl text-xs font-bold border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Descargar Excel ({rows.length})
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="overflow-auto flex-1 px-6 py-4">
+          {!searched && !loading && (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <svg className="w-12 h-12 mb-3 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <p className="text-sm">Aplica filtros y presiona Buscar</p>
+            </div>
+          )}
+          {searched && rows.length === 0 && <p className="text-center text-sm text-gray-400 py-12">Sin resultados</p>}
+          {rows.length > 0 && (
+            <table className="w-full text-xs min-w-[800px]">
+              <thead><tr style={{ backgroundColor: '#2d5a3d' }}>
+                {['Código','Tipo','Estado','Campaña','Productor','Kg','Variedad','Planta','Fecha Adq.'].map(h => (
+                  <th key={h} style={{ color: '#fff' }} className="text-left px-3 py-2 text-[0.65rem] font-bold uppercase tracking-wider border-r border-green-700 last:border-r-0">{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {rows.map(l => (
+                  <tr key={l.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-3 py-2 font-mono font-bold text-gray-800">{l.codigo}</td>
+                    <td className="px-3 py-2 text-gray-600">{l.tipoProducto?.tipo ?? '—'}</td>
+                    <td className="px-3 py-2">
+                      <span className="inline-flex items-center gap-1 text-[0.6rem] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${ESTADO_DOT[l.estado]}`}/>
+                        {ESTADO_LABEL[l.estado]}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-gray-500">{l.campana?.nombre ?? '—'}</td>
+                    <td className="px-3 py-2 text-gray-600">{l.productor ? `${l.productor.nombre} ${l.productor.apellido ?? ''}`.trim() : '—'}</td>
+                    <td className="px-3 py-2 font-mono text-gray-700">{Number(l.cantidadKg).toFixed(2)}</td>
+                    <td className="px-3 py-2 text-gray-500">{l.variedad ?? '—'}</td>
+                    <td className="px-3 py-2 text-gray-500">{l.planta ?? '—'}</td>
+                    <td className="px-3 py-2 text-gray-500">{l.fechaAdquisicion ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const PINNED_KEY = 'lotes:pinnedFilters';
 
 function loadPinned() {
@@ -289,6 +449,7 @@ export function LotesPage() {
   const [loading, setLoading] = useState(true);
   const [page,  setPage]  = useState(1);
   const [modal, setModal] = useState<'create' | 'edit' | 'delete' | null>(null);
+  const [showExport, setShowExport] = useState(false);
   const [selected, setSelected] = useState<Lote | null>(null);
 
   const [tiposProducto, setTiposProducto] = useState<TipoProducto[]>([]);
@@ -372,6 +533,10 @@ export function LotesPage() {
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             Mermas
           </button>
+          <button onClick={() => setShowExport(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-gray-300 text-gray-700 hover:bg-gray-50">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Exportar
+          </button>
           <button onClick={() => setModal('create')} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white" style={{ backgroundColor: '#1A2B23' }}>
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
             Nuevo
@@ -448,7 +613,7 @@ export function LotesPage() {
         </div>
 
         <div className="flex flex-wrap gap-1.5 mt-3">
-          {(['', 'PRE_ADQUISICION', 'POST_ADQUISICION', 'PRE_TRILLADO', 'POST_TRILLADO', 'PREPARADO', 'EMBARCADO', 'EXPORTADO'] as const).map(e => (
+          {(['', 'PRE_ADQUISICION', 'PRE_ALISTADO', 'PREPARADO', 'EMBARCADO', 'EXPORTADO'] as const).map(e => (
             <button key={e} onClick={() => { setFilterEstado(e as LoteEstado | ''); setPage(1); }} className={`px-2.5 py-1 rounded-full text-[0.65rem] font-semibold border transition-all ${filterEstado === e ? 'text-white border-transparent' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500'}`} style={filterEstado === e ? { backgroundColor: '#1A2B23' } : {}}>
               {e === '' ? 'Todos' : ESTADO_LABEL[e as LoteEstado]}
             </button>
@@ -554,6 +719,7 @@ export function LotesPage() {
       {modal === 'delete' && selected && (
         <DeleteConfirm lote={selected} onClose={() => setModal(null)} onConfirm={handleDelete} />
       )}
+      {showExport && <ExportarLotesModal onClose={() => setShowExport(false)} />}
     </div>
   );
 }

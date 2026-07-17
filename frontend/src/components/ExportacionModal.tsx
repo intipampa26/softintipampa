@@ -5,6 +5,7 @@ import { ModalLoadingOverlay } from '@/components/ui/ModalLoadingOverlay';
 import { useToast } from '@/contexts/ToastContext';
 import { ordenesVentaService } from '../services/ordenes-venta.service';
 import { lotesFinalesService } from '@/services/lotes-finales.service';
+import { lotesService } from '@/services/lotes.service';
 
 const CP = '#445D46';
 const BD = '#D9DDD8';
@@ -465,12 +466,16 @@ export function ExportacionModal({ orden, initialTab = 'plan', onClose }: Props)
         } catch { /* silent */ }
       }
       toast.success('Guardado correctamente');
+      if (activeTab === 'cierre') {
+        const ids = lotesConPrecio.map(l => l.loteFinalId).filter(Boolean);
+        if (ids.length) lotesService.updateEstadoByLoteFinals(ids, 'EMBARCADO').catch(() => {});
+      }
     } catch {
       writeCache(PENDING_KEY, dto);
       setPendingSync(true);
       toast.offline('Error de red — guardado localmente');
     } finally { setSaving(false); }
-  }, [buildDto, offline, orden.dbId, CACHE_KEY, PENDING_KEY, toast, kardexRegistrado]);
+  }, [buildDto, offline, orden.dbId, CACHE_KEY, PENDING_KEY, toast, kardexRegistrado, activeTab, lotesConPrecio]);
 
   // ── File uploads ──────────────────────────────────────────────────────────────
   const triggerUpload = (cat: string) => {

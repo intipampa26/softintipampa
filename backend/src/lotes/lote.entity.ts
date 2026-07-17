@@ -14,13 +14,11 @@ import { Parcela } from '../parcelas/parcela.entity';
 import { TipoProducto } from '../tipos-producto/tipo-producto.entity';
 
 export enum LoteEstado {
-  PRE_ADQUISICION  = 'PRE_ADQUISICION',
-  POST_ADQUISICION = 'POST_ADQUISICION',
-  PRE_TRILLADO     = 'PRE_TRILLADO',
-  POST_TRILLADO    = 'POST_TRILLADO',
-  PREPARADO        = 'PREPARADO',
-  EMBARCADO        = 'EMBARCADO',
-  EXPORTADO        = 'EXPORTADO',
+  PRE_ADQUISICION = 'PRE_ADQUISICION',
+  PRE_ALISTADO    = 'PRE_ALISTADO',
+  PREPARADO       = 'PREPARADO',
+  EMBARCADO       = 'EMBARCADO',
+  EXPORTADO       = 'EXPORTADO',
 }
 
 @Entity('lotes')

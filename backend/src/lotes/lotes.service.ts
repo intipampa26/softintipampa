@@ -249,14 +249,12 @@ export class LotesService {
       const kgRestantes = Number(lote.cantidadKg) - sumaDiv;
       await qr.manager.update(Lote, lote.id, {
         cantidadKg: kgRestantes < 0.001 ? 0 : kgRestantes,
-        estado:     kgRestantes < 0.001
-          ? LoteEstado.POST_TRILLADO
-          : LoteEstado.PRE_TRILLADO,
+        estado:     LoteEstado.PRE_ALISTADO,
       });
 
       await qr.commitTransaction();
 
-      
+
       const fecha = new Date().toISOString().slice(0, 10);
       for (const lf of nuevosLf) {
         await this.kardexService.registrar({
@@ -353,9 +351,7 @@ export class LotesService {
         const kgRestantes = Number(lote.cantidadKg) - Number(origen.cantidadKg);
         await qr.manager.update(Lote, lote.id, {
           cantidadKg: kgRestantes < 0.001 ? 0 : kgRestantes,
-          estado:     kgRestantes < 0.001
-            ? LoteEstado.POST_TRILLADO
-            : LoteEstado.PRE_TRILLADO,
+          estado:     LoteEstado.PRE_ALISTADO,
         });
       }
 
@@ -390,5 +386,16 @@ export class LotesService {
       relations: ['loteFinal', 'loteFinal.tipoProducto'],
       order: { createdAt: 'ASC' },
     });
+  }
+
+  async updateEstadoByLoteFinalIds(loteFinalIds: number[], estado: LoteEstado): Promise<void> {
+    if (!loteFinalIds.length) return;
+    const origenes = await this.lfOrigenRepo.find({
+      where: { loteFinalId: In(loteFinalIds) },
+    });
+    const loteIds = [...new Set(origenes.map(o => o.loteOrigenId))];
+    if (loteIds.length) {
+      await this.loteRepo.update({ id: In(loteIds) }, { estado });
+    }
   }
 }

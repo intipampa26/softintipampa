@@ -1,10 +1,11 @@
 import {
-  Controller, Get, Post, Put, Delete, Body,
+  Controller, Get, Post, Put, Patch, Delete, Body,
   Param, Query, ParseIntPipe, UseGuards,
   HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LotesService } from './lotes.service';
+import { LoteEstado } from './lote.entity';
 import { CreateLoteDto } from './dto/create-lote.dto';
 import { UpdateLoteDto } from './dto/update-lote.dto';
 import { FilterLotesDto } from './dto/filter-lotes.dto';
@@ -74,5 +75,11 @@ export class LotesController {
   @Post('mezclar')
   mezclar(@Body() dto: MezclarLotesDto) {
     return this.service.mezclar(dto);
+  }
+
+  @Patch('update-by-lote-finals')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  updateEstadoByLoteFinals(@Body() body: { loteFinalIds: number[]; estado: LoteEstado }) {
+    return this.service.updateEstadoByLoteFinalIds(body.loteFinalIds, body.estado);
   }
 }

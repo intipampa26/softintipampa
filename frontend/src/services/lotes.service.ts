@@ -1,6 +1,6 @@
 import api from '@/api/axios';
 
-export type LoteEstado = 'PRE_ADQUISICION' | 'POST_ADQUISICION' | 'PRE_TRILLADO' | 'POST_TRILLADO' | 'PREPARADO' | 'EMBARCADO' | 'EXPORTADO';
+export type LoteEstado = 'PRE_ADQUISICION' | 'PRE_ALISTADO' | 'PREPARADO' | 'EMBARCADO' | 'EXPORTADO';
 
 export interface Lote {
   id: number;
@@ -129,6 +129,10 @@ class LotesService {
   async promoverALf(id: number, dto: PromoverLfDto = {}): Promise<import('./lotes-finales.service').LoteFinal> {
     const { data } = await api.post(`/lotes/${id}/promover-a-lf`, dto);
     return data;
+  }
+
+  async updateEstadoByLoteFinals(loteFinalIds: number[], estado: LoteEstado): Promise<void> {
+    await api.patch('/lotes/update-by-lote-finals', { loteFinalIds, estado });
   }
 }
 

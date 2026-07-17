@@ -12,31 +12,27 @@ function apiMsg(err: unknown): string {
   return e?.response?.data?.message ?? e?.message ?? 'Error inesperado';
 }
 
-const POST_TRILLADO: LoteEstado[] = ['POST_TRILLADO', 'PREPARADO', 'EMBARCADO', 'EXPORTADO'];
+const ALISTADO_STATES: LoteEstado[] = ['PRE_ALISTADO', 'PREPARADO', 'EMBARCADO', 'EXPORTADO'];
 function displaySubtipo(estado: LoteEstado, tp?: { tipo: string; subtipoEntrada: string }) {
   if (!tp) return '';
   return tp.tipo === 'CAFE'
-    ? (POST_TRILLADO.includes(estado) ? 'Café Pergamino' : 'Café Oro Verde')
+    ? (ALISTADO_STATES.includes(estado) ? 'Café Pergamino' : 'Café Oro Verde')
     : tp.subtipoEntrada.replace(/_/g, ' ');
 }
 
 const ESTADO_LABEL: Record<string, string> = {
-  PRE_ADQUISICION:  'Pre Adquisición',
-  POST_ADQUISICION: 'Post Adquisición',
-  PRE_TRILLADO:     'Pre Alistado',
-  POST_TRILLADO:    'Post Alistado',
-  PREPARADO:        'Preparado',
-  EMBARCADO:        'Embarcado',
-  EXPORTADO:        'Exportado',
+  PRE_ADQUISICION: 'Pre Adquisición',
+  PRE_ALISTADO:    'Pre Alistado',
+  PREPARADO:       'Preparado',
+  EMBARCADO:       'Embarcado',
+  EXPORTADO:       'Exportado',
 };
 const ESTADO_COLOR: Record<string, string> = {
-  PRE_ADQUISICION:  'bg-orange-100 text-orange-700 border-orange-200',
-  POST_ADQUISICION: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  PRE_TRILLADO:     'bg-amber-100 text-amber-700 border-amber-200',
-  POST_TRILLADO:    'bg-lime-100 text-lime-700 border-lime-200',
-  PREPARADO:        'bg-green-100 text-green-700 border-green-200',
-  EMBARCADO:        'bg-blue-100 text-blue-700 border-blue-200',
-  EXPORTADO:        'bg-indigo-100 text-indigo-700 border-indigo-200',
+  PRE_ADQUISICION: 'bg-orange-100 text-orange-700 border-orange-200',
+  PRE_ALISTADO:    'bg-amber-100 text-amber-700 border-amber-200',
+  PREPARADO:       'bg-green-100 text-green-700 border-green-200',
+  EMBARCADO:       'bg-blue-100 text-blue-700 border-blue-200',
+  EXPORTADO:       'bg-indigo-100 text-indigo-700 border-indigo-200',
 };
 
 function PromoverModal({ lote, onClose, onConfirm }: { lote: Lote; onClose: () => void; onConfirm: () => Promise<string> }) {

@@ -219,15 +219,15 @@ export function ExportarMuestrasModal({ onClose }: Props) {
                   <table className="w-full text-xs min-w-max border-collapse">
                     <thead>
                       <tr>
-                        <th className="px-3 py-2 text-[0.6rem] font-bold text-white text-center border-r border-green-700 w-8" style={{ backgroundColor: '#2d5a3d' }}>#</th>
+                        <th style={{ backgroundColor: '#2d5a3d', color: '#fff' }} className="px-3 py-2 text-[0.6rem] font-bold text-center border-r border-green-700 w-8 uppercase tracking-wider">#</th>
                         {COLS.map(col => (
-                          <th key={col} className="px-3 py-2 text-[0.6rem] font-bold text-white text-left border-r border-green-700 last:border-r-0 whitespace-nowrap" style={{ backgroundColor: '#2d5a3d' }}>{col}</th>
+                          <th key={col} style={{ backgroundColor: '#2d5a3d', color: '#fff' }} className="px-3 py-2 text-[0.6rem] font-bold text-left border-r border-green-700 last:border-r-0 whitespace-nowrap uppercase tracking-wider">{col}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {rows.map((row, i) => (
-                        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#f2f7f2]'}>
+                        <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           <td className="px-3 py-1.5 text-gray-400 text-center border-r border-gray-100 font-mono">{i + 1}</td>
                           {COLS.map(col => (
                             <td key={col} className="px-3 py-1.5 text-gray-700 border-r border-gray-100 last:border-r-0 whitespace-nowrap max-w-[180px] truncate" title={row[col]}>

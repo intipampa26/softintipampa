@@ -670,25 +670,21 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Lote / Lote Final</label>
                 {(() => {
                   const ESTADO_COLORS: Record<string, string> = {
-                    PRE_ADQUISICION:  'bg-orange-100 text-orange-700 border-orange-200',
-                    POST_ADQUISICION: 'bg-blue-100 text-blue-700 border-blue-200',
-                    PRE_TRILLADO:     'bg-yellow-100 text-yellow-700 border-yellow-200',
-                    POST_TRILLADO:    'bg-purple-100 text-purple-700 border-purple-200',
-                    PREPARADO:        'bg-teal-100 text-teal-700 border-teal-200',
-                    EMBARCADO:        'bg-indigo-100 text-indigo-700 border-indigo-200',
-                    EXPORTADO:        'bg-green-100 text-green-700 border-green-200',
+                    PRE_ADQUISICION: 'bg-orange-100 text-orange-700 border-orange-200',
+                    PRE_ALISTADO:    'bg-amber-100 text-amber-700 border-amber-200',
+                    PREPARADO:       'bg-teal-100 text-teal-700 border-teal-200',
+                    EMBARCADO:       'bg-indigo-100 text-indigo-700 border-indigo-200',
+                    EXPORTADO:       'bg-green-100 text-green-700 border-green-200',
                   };
                   const ESTADO_LABELS: Record<string, string> = {
-                    PRE_ADQUISICION:  'Pre Adquisición',
-                    POST_ADQUISICION: 'Post Adquisición',
-                    PRE_TRILLADO:     'Pre Alistado',
-                    POST_TRILLADO:    'Post Alistado',
-                    PREPARADO:        'Preparado',
-                    EMBARCADO:        'Embarcado',
-                    EXPORTADO:        'Exportado',
+                    PRE_ADQUISICION: 'Pre Adquisición',
+                    PRE_ALISTADO:    'Pre Alistado',
+                    PREPARADO:       'Preparado',
+                    EMBARCADO:       'Embarcado',
+                    EXPORTADO:       'Exportado',
                     PENDIENTE_TRILLADO: 'Pendiente alistado',
-                    TRILLADO:         'Alistado',
-                    VENDIDO:          'Vendido',
+                    TRILLADO:        'Alistado',
+                    VENDIDO:         'Vendido',
                   };
                   const selectVal = form.loteId
                     ? `lote-${form.loteId}`
@@ -1228,7 +1224,7 @@ function AdquirirModal({
     setSaving(true);
     try {
       await onConfirm({
-        estado:           'POST_ADQUISICION',
+        estado:           'PRE_ALISTADO',
         cantidadKg:       kg,
         cantidadSacos:    form.cantidadSacos    ? Number(form.cantidadSacos)    : undefined,
         fechaAdquisicion: form.fechaAdquisicion || undefined,
@@ -1446,7 +1442,7 @@ function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir
               Proceso: <span className="text-gray-600 font-semibold">{muestra.proceso}</span>
             </p>
           )}
-          {muestra.lote?.estado === 'PRE_ADQUISICION' && onAdquirir && (
+          {['PRE_ADQUISICION', 'PRE_ALISTADO'].includes(muestra.lote?.estado ?? '') && onAdquirir && (
             <button
               onClick={onAdquirir}
               className="mt-1 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.65rem] font-bold text-white uppercase tracking-wide hover:opacity-90 active:scale-[0.97] transition-all"
@@ -1777,7 +1773,7 @@ export function MuestrasPage() {
             >
               <option value="">Todos los lotes</option>
               <option value="PRE_ADQUISICION">Pre-Adquisición</option>
-              <option value="POST_ADQUISICION">Post-Adquisición</option>
+              <option value="PRE_ALISTADO">Pre-Alistado</option>
             </select>
           </div>
           <div>
@@ -1931,7 +1927,7 @@ export function MuestrasPage() {
                   onEvaluaciones={() => { setSelected(m); setModal('evaluaciones'); }}
                   onEditar={()       => { setSelected(m); setModal('edit'); }}
                   onEliminar={()     => { setSelected(m); setModal('delete'); }}
-                  onAdquirir={m.lote?.estado === 'PRE_ADQUISICION' ? () => handleAdquirir(m) : undefined}
+                  onAdquirir={['PRE_ADQUISICION', 'PRE_ALISTADO'].includes(m.lote?.estado ?? '') ? () => handleAdquirir(m) : undefined}
                   labelMode={labelMode}
                   selected={selectedEtiquetas.has(m.id)}
                   onToggleSelect={() => toggleEtiqueta(m.id)}

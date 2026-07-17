@@ -3,6 +3,7 @@ import { X, CheckCheck, Calendar, ChevronDown, Star, FileText, Upload, Trash2, G
 import { ModalLoadingOverlay } from '@/components/ui/ModalLoadingOverlay';
 import { useToast } from '@/contexts/ToastContext';
 import { ordenesVentaService } from '../services/ordenes-venta.service';
+import { lotesService } from '@/services/lotes.service';
 
 const CP = '#445D46';
 const BD = '#D9DDD8';
@@ -139,6 +140,11 @@ export function PostVentaModal({ orden, initialTab = 'importacion', onClose }: P
       };
       await ordenesVentaService.upsertPostVenta(orden.dbId, dto);
       toast.success('Guardado correctamente');
+      try {
+        const alistado = await ordenesVentaService.getAlistado(orden.dbId);
+        const ids: number[] = (alistado?.lotesAsignados ?? []).map((a: any) => Number(a.loteFinalId)).filter(Boolean);
+        if (ids.length) lotesService.updateEstadoByLoteFinals(ids, 'EXPORTADO').catch(() => {});
+      } catch { /* silent */ }
     } catch {
       toast.error('Error al guardar');
     } finally {

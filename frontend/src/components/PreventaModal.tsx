@@ -201,7 +201,7 @@ export function PreventaModal({ orden, initialTab = 'muestras', onClose }: Props
         setMuestras(mapMuestrasData(result.data));
       } catch { /* silencioso */ }
       finally { setBuscando(false); }
-    }, 5000);
+    }, 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [busqueda, filterProductor, campanaIdCargado]);
 
