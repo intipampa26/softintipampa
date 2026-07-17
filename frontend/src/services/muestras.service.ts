@@ -168,16 +168,15 @@ function applyFilters(all: Muestra[], filter: FilterMuestrasDto): Muestra[] {
   return result;
 }
 
-function toApiPayload(dto: Partial<CreateMuestraDto>): Record<string, unknown> {
-  
-  const { fecha, tipoProducto, resultado, puntaje, ...rest } = dto as any;
+function toApiPayload(dto: Partial<CreateMuestraDto>, isUpdate = false): Record<string, unknown> {
+  const { fecha, tipoProducto, puntaje, loteCreado, ...rest } = dto as any;
   const payload: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(rest)) {
-    
     if (v === '' || v === null || v === undefined) continue;
     payload[k] = v;
   }
   if (fecha) payload.fechaRegistro = fecha;
+  if (!isUpdate && loteCreado !== undefined) payload.loteCreado = loteCreado;
   return payload;
 }
 
@@ -336,14 +335,14 @@ class MuestrasService {
 
   async update(id: number, dto: Partial<CreateMuestraDto>): Promise<Muestra> {
     if (!navigator.onLine) {
-      syncService.enqueue({ url: `/muestras/${id}`, method: 'PUT', body: toApiPayload(dto), module: 'muestras' });
+      syncService.enqueue({ url: `/muestras/${id}`, method: 'PUT', body: toApiPayload(dto, true), module: 'muestras' });
       const cache = readCache().map((m) =>
         m.id === id ? { ...m, ...dto, updatedAt: new Date().toISOString() } : m,
       );
       writeCache(cache);
       return cache.find((m) => m.id === id) as Muestra;
     }
-    const { data } = await api.put(`/muestras/${id}`, toApiPayload(dto));
+    const { data } = await api.put(`/muestras/${id}`, toApiPayload(dto, true));
     writeCache(readCache().map((m) => (m.id === id ? data : m)));
     return data;
   }

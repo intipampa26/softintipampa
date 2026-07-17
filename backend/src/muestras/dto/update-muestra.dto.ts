@@ -18,6 +18,8 @@ export class UpdateMuestraDto {
   @IsEnum(EstadoMuestra) @IsOptional() estado?: EstadoMuestra;
   @IsString() @IsOptional() @MaxLength(200) variedad?: string;
   @IsString() @IsOptional() @MaxLength(200) proceso?: string;
+  @IsString() @IsOptional() @MaxLength(100) planta?: string;
+  @IsString() @IsOptional() @MaxLength(50)  estadoLote?: string;
   @IsString() @IsOptional() @MaxLength(200) categoriaMuestra?: string;
   @IsDateString() @IsOptional() fechaCata?: string;
   @IsInt() @IsOptional() @Type(() => Number) añoCosecha?: number;
