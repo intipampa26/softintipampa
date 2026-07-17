@@ -40,6 +40,14 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
 
   useEffect(() => { skusService.findAll().then(setSkus); }, []);
 
+  const tipo = lf.tipoProducto?.tipo ?? '';
+  const filteredSkus = skus.filter(s => {
+    if (s.soloOtros) return false;
+    if (tipo === 'CAFE')  return s.codigo?.startsWith('CF') ?? false;
+    if (tipo === 'CACAO') return s.codigo?.startsWith('CA') ?? false;
+    return true;
+  });
+
   const cantLf = Number(lf.cantidadKg);
   const suma = Number(form.pesoPfKg ?? 0) + Number(form.mermaReutilizableKg ?? 0) + Number(form.mermaDesechableKg ?? 0) + Number(form.sobranteExportableKg ?? 0);
   const diferencia = Math.abs(suma - cantLf);
@@ -199,7 +207,7 @@ function TrilladoModal({ lf, onClose, onConfirm }: { lf: LoteFinal; onClose: () 
             <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">SKU (nombre comercial)</label>
             <select value={form.skuId ?? ''} onChange={e => setForm(f => ({ ...f, skuId: e.target.value ? Number(e.target.value) : undefined }))} className={cls}>
               <option value="">Sin SKU</option>
-              {skus.map(s => <option key={s.id} value={s.id}>{s.codigo ? `${s.codigo} · ${s.nombre}` : s.nombre}</option>)}
+              {filteredSkus.map(s => <option key={s.id} value={s.id}>{s.codigo ? `${s.codigo} · ${s.nombre}` : s.nombre}</option>)}
             </select>
           </div>
 

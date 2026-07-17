@@ -7,10 +7,10 @@ export class TrillarDto {
   @IsDateString()
   fecha: string;
 
-  @IsString() @MaxLength(200) planta: string;
-  @IsString() @MaxLength(100) malla: string;
-  @IsString() @MaxLength(200) tipoSeleccion: string;
-  @IsString() @MaxLength(200) encargado: string;
+  @IsString() @IsOptional() @MaxLength(500) planta?: string;
+  @IsString() @IsOptional() @MaxLength(100) malla?: string;
+  @IsString() @IsOptional() @MaxLength(500) tipoSeleccion?: string;
+  @IsString() @IsOptional() @MaxLength(500) encargado?: string;
   @IsInt()    @IsOptional() encargadoUsuarioId?: number;
 
    

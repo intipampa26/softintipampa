@@ -872,19 +872,6 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
             )}
           </div>
 
-          <div className="max-w-xs">
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Resultado de evaluación</label>
-            <select
-              value={form.resultado ?? ''}
-              onChange={(e) => setForm(f => ({ ...f, resultado: (e.target.value as ResultadoMuestra) || undefined }))}
-              className={cls}
-            >
-              <option value="">Sin definir</option>
-              <option value="aprobado">✓ Aprobado — apto para acopio</option>
-              <option value="descartado">✗ Descartado</option>
-            </select>
-          </div>
-
           <div className="space-y-3 pt-2 border-t border-gray-100">
             <div className="flex items-center gap-2">
               <span className="w-5 h-5 rounded-full text-white text-[0.65rem] font-black flex items-center justify-center shrink-0" style={{ backgroundColor: '#1A2B23' }}>2</span>

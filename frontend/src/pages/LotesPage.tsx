@@ -235,6 +235,7 @@ function LoteFormModal({ tiposProducto, campanas, onClose, onSave, initial }: {
                   onChange={e => setForm(f => ({ ...f, planta: e.target.value || undefined }))}
                   className={`${cls} mt-1`}
                   placeholder="Especificar planta…"
+                  maxLength={200}
                   autoFocus
                 />
               )}

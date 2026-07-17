@@ -1,6 +1,6 @@
 import {
   IsString, IsInt, IsOptional,
-  IsNumber, IsDateString, Min, MaxLength, MinLength,
+  IsNumber, IsDateString, Min, MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -48,9 +48,9 @@ export class CreateLoteDto {
   variedad?: string;
 
   @IsString()
-  @MinLength(1)
+  @IsOptional()
   @MaxLength(200)
-  planta: string;
+  planta?: string;
 
   @IsString()
   @IsOptional()
