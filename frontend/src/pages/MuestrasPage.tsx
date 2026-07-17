@@ -843,7 +843,8 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
                   value={form.tipoMuestra ?? ''}
                   onChange={(e) => {
                     const tm = (e.target.value as TipoMuestra) || undefined;
-                    const tp = tiposProducto.find(t => t.tipo === tm?.toUpperCase());
+                    const tipoDb = esTipoCafe(tm) ? 'CAFE' : esTipoCacao(tm) ? 'CACAO' : undefined;
+                    const tp = tipoDb ? tiposProducto.find(t => t.tipo === tipoDb) : undefined;
                     setTipoProductoId(tp?.id);
                     setForm(f => ({ ...f, tipoMuestra: tm }));
                   }}
