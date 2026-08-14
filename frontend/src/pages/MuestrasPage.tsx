@@ -1436,7 +1436,7 @@ function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir
               ACOPIAR
             </button>
           )}
-          {muestra.lote?.estado === 'PRE_ALISTADO' && onPdfAcopio && (
+          {muestra.lote && muestra.lote.estado !== 'PRE_ADQUISICION' && onPdfAcopio && (
             <button
               onClick={e => { e.stopPropagation(); onPdfAcopio(); }}
               className="mt-1 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.65rem] font-bold uppercase tracking-wide hover:opacity-90 active:scale-[0.97] transition-all border"
@@ -2034,7 +2034,7 @@ export function MuestrasPage() {
                   onEditar={()       => { setSelected(m); setModal('edit'); }}
                   onEliminar={()     => { setSelected(m); setModal('delete'); }}
                   onAdquirir={m.lote?.estado === 'PRE_ADQUISICION' ? () => handleAdquirir(m) : undefined}
-                  onPdfAcopio={m.lote?.estado === 'PRE_ALISTADO' ? () => handlePdfAcopio(m) : undefined}
+                  onPdfAcopio={m.lote && m.lote.estado !== 'PRE_ADQUISICION' ? () => handlePdfAcopio(m) : undefined}
                   labelMode={labelMode}
                   selected={selectedEtiquetas.has(m.id)}
                   onToggleSelect={() => toggleEtiqueta(m.id)}

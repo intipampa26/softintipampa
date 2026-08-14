@@ -817,15 +817,6 @@ function BatchCacaoModal({ lfs, onClose, onConfirm }: {
             </p>
           </div>
 
-          {/* SKU */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">SKU (opcional)</label>
-            <select value={skuId ?? ''} onChange={e => setSkuId(e.target.value ? Number(e.target.value) : undefined)} className={cls}>
-              <option value="">Sin SKU</option>
-              {skus.map(s => <option key={s.id} value={s.id}>{s.codigo ? `${s.codigo} · ${s.nombre}` : s.nombre}</option>)}
-            </select>
-          </div>
-
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancelar</button>
             <button type="submit" disabled={saving || lfs.length === 0 || pf < 0} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ backgroundColor: '#1A2B23' }}>
