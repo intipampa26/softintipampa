@@ -1674,17 +1674,39 @@ export function MuestrasPage() {
       const W = 210, M = 16, CW = W - M * 2;
       let y = 0;
 
+      // Cargar logo
+      let logoDataUrl: string | null = null;
+      try {
+        const resp = await fetch('/logo.png');
+        const blob = await resp.blob();
+        logoDataUrl = await new Promise<string>(res => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch { /* sin logo */ }
+
       // Header
+      const HEADER_H = 24;
       doc.setFillColor(40, 63, 52);
-      doc.rect(0, 0, W, 22, 'F');
+      doc.rect(0, 0, W, HEADER_H, 'F');
+
+      const LOGO_SIZE = 16;
+      const LOGO_X = M;
+      const LOGO_Y = (HEADER_H - LOGO_SIZE) / 2;
+      if (logoDataUrl) {
+        doc.addImage(logoDataUrl, 'PNG', LOGO_X, LOGO_Y, LOGO_SIZE, LOGO_SIZE);
+      }
+
+      const TEXT_X = logoDataUrl ? LOGO_X + LOGO_SIZE + 4 : M;
       doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(255, 255, 255);
-      doc.text('COLLECTIVE BEAN', M, 10);
+      doc.text('COLLECTIVE BEAN', TEXT_X, 11);
       doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
-      doc.text('Ficha de Acopio — Ingreso al Almacén', M, 16);
+      doc.text('Ficha de Acopio — Ingreso al Almacén', TEXT_X, 17.5);
       doc.setFontSize(7);
-      doc.text(`Generado: ${new Date().toLocaleDateString('es-PE')}`, W - M, 10, { align: 'right' });
-      doc.text(lote.codigo, W - M, 16, { align: 'right' });
-      y = 32;
+      doc.text(`Generado: ${new Date().toLocaleDateString('es-PE')}`, W - M, 11, { align: 'right' });
+      doc.text(lote.codigo, W - M, 17.5, { align: 'right' });
+      y = 34;
 
       // Título del lote
       doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(40, 63, 52);
