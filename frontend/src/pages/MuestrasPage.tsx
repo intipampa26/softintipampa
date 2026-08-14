@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import JSZip from 'jszip';
 import { buildSensorialCafePdfDirect, buildFisicaCafePdfDirect, PdfMuestraInfo } from '@/utils/pdf-evaluaciones';
 
-const VARIEDADES_CAFE  = ['Caturra','Borbón Rojo','Borbon naranja','Gesha','Pacamara','Tabi','Sidra','Papayo','Blend','Pache','Costa Rica 95','Tipica','Catimor','Maragogipe','SL34','Villa Sarchí','Marsellesa','Limani'];
-const VARIEDADES_CACAO = ['Cacao','Macambo','Cupui','Copuazu','Manteca de cacao','Polvo de cacao','Nibs de cacao','Pasta de cacao'];
+const VARIEDADES_CAFE  = ['Caturra','Borbón Rojo','Borbon naranja','Gesha','Pacamara','Tabi','Sidra','Papayo','Blend','Pache','Costa Rica 95','Tipica','Catimor','Maragogipe','SL34','Villa Sarchí','Marsellesa','Limani','Otro'];
+const VARIEDADES_CACAO = ['Cacao','Macambo','Cupui','Vrae 99','Maranón','Chuncho','Blend','Vrae15','Chuncho Blanco','ICS','IMC','Porcelana','CCN','Huallaga','Copuazu','Manteca de cacao','Polvo de cacao','Nibs de cacao','Pasta de cacao','Otro'];
 import { useSearchParams } from 'react-router-dom';
 import {
   EvaluacionSensorialCacao,
@@ -20,6 +20,7 @@ import {
 import { campanasService, Campana } from '@/services/campanas.service';
 import { productoresService, Productor } from '@/services/productores.service';
 import { lotesService, Lote, CreateLoteDto, LoteEstado } from '@/services/lotes.service';
+import { parcelasService, Parcela } from '@/services/parcelas.service';
 import { lotesFinalesService, LoteFinal } from '@/services/lotes-finales.service';
 import { tiposProductoService, TipoProducto } from '@/services/tipos-producto.service';
 import { syncService } from '@/services/sync.service';
@@ -586,6 +587,7 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
           productorId: Number(form.productorId),
           campanaId:   form.campanaId ? Number(form.campanaId) : undefined,
           cantidadKg:  form.cantidadKg ? Number(form.cantidadKg) : 1,
+          variedad:    form.variedad || undefined,
         });
         loteId = nuevoLote.id;
       }
@@ -836,40 +838,6 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
               </div>
             )}
 
-            {!form.loteId && (
-              <div className="max-w-xs">
-                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Tipo de producto</label>
-                <select
-                  value={form.tipoMuestra ?? ''}
-                  onChange={(e) => {
-                    const tm = (e.target.value as TipoMuestra) || undefined;
-                    const tipoDb = esTipoCafe(tm) ? 'CAFE' : esTipoCacao(tm) ? 'CACAO' : undefined;
-                    const tp = tipoDb ? tiposProducto.find(t => t.tipo === tipoDb) : undefined;
-                    setTipoProductoId(tp?.id);
-                    setForm(f => ({ ...f, tipoMuestra: tm }));
-                  }}
-                  className={cls}
-                >
-                  <option value="">Sin especificar</option>
-                  <option value="pergamino">Pergamino</option>
-                  <option value="oro">Oro</option>
-                  <option value="grano_cacao">Grano Cacao</option>
-                </select>
-              </div>
-            )}
-
-            {form.tipoMuestra && (
-              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${
-                esTipoCafe(form.tipoMuestra)
-                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                  : 'bg-purple-100 text-purple-800 border border-purple-200'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${esTipoCafe(form.tipoMuestra) ? 'bg-amber-500' : 'bg-purple-500'}`} />
-                {esTipoCafe(form.tipoMuestra)
-                  ? `${TIPO_MUESTRA_LABEL[form.tipoMuestra]} — se evaluará con protocolo SCA`
-                  : 'GRANO CACAO — se evaluará con protocolo IICTE / Cut Test'}
-              </div>
-            )}
           </div>
 
           <div className="space-y-3 pt-2 border-t border-gray-100">
@@ -941,11 +909,6 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Tipo de muestra</label>
-              <input value={form.categoriaMuestra ?? ''} onChange={(e) => set('categoriaMuestra')(e.target.value)}
-                className={cls} placeholder="Ej: Pergamino, Verde, Tostado…" />
-            </div>
           </div>
 
           <div className="space-y-3 pt-2 border-t border-gray-100">
@@ -1160,6 +1123,7 @@ interface CardProps {
   onEditar:         () => void;
   onEliminar:       () => void;
   onAdquirir?:      () => void;
+  onPdfAcopio?:     () => void;
   labelMode?:       boolean;
   selected?:        boolean;
   onToggleSelect?:  () => void;
@@ -1167,14 +1131,17 @@ interface CardProps {
 
 function AdquirirModal({
   loteRef,
+  muestraVariedad,
   onClose,
   onConfirm,
 }: {
   loteRef: { id: number; codigo: string };
+  muestraVariedad?: string;
   onClose: () => void;
   onConfirm: (dto: Partial<CreateLoteDto> & { estado: LoteEstado }) => Promise<void>;
 }) {
-  const [lote,   setLote]   = useState<Lote | null>(null);
+  const [lote,    setLote]    = useState<Lote | null>(null);
+  const [parcelas, setParcelas] = useState<Parcela[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
   const toast = useToast();
@@ -1183,9 +1150,11 @@ function AdquirirModal({
     cantidadKg:       '',
     cantidadSacos:    '',
     fechaAdquisicion: '',
-    variedad:         '',
+    costoTotal:       '',
     planta:           '',
+    parcelaId:        '',
     observaciones:    '',
+    variedad:         '',
   });
 
   const cls = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500';
@@ -1197,10 +1166,15 @@ function AdquirirModal({
         cantidadKg:       l.cantidadKg != null ? String(l.cantidadKg) : '',
         cantidadSacos:    l.cantidadSacos != null ? String(l.cantidadSacos) : '',
         fechaAdquisicion: l.fechaAdquisicion ?? '',
-        variedad:         l.variedad ?? '',
+        costoTotal:       l.costoTotal != null ? String(l.costoTotal) : '',
         planta:           l.planta ?? '',
+        parcelaId:        l.parcelaId != null ? String(l.parcelaId) : '',
         observaciones:    l.observaciones ?? '',
+        variedad:         l.variedad ?? muestraVariedad ?? '',
       });
+      if (l.productorId) {
+        parcelasService.getPage(1, 100, l.productorId).then(r => setParcelas(r.data));
+      }
       setLoading(false);
     }).catch(() => { toast.error('Error al cargar datos del lote'); setLoading(false); });
   }, [loteRef.id]);
@@ -1214,11 +1188,13 @@ function AdquirirModal({
       await onConfirm({
         estado:           'PRE_ALISTADO',
         cantidadKg:       kg,
-        cantidadSacos:    form.cantidadSacos    ? Number(form.cantidadSacos)    : undefined,
+        cantidadSacos:    form.cantidadSacos    ? Math.round(Number(form.cantidadSacos)) : undefined,
         fechaAdquisicion: form.fechaAdquisicion || undefined,
-        variedad:         form.variedad         || undefined,
+        costoTotal:       form.costoTotal       ? Number(form.costoTotal)       : undefined,
         planta:           form.planta           || undefined,
+        parcelaId:        form.parcelaId        ? Number(form.parcelaId)        : undefined,
         observaciones:    form.observaciones    || undefined,
+        variedad:         form.variedad         || undefined,
       });
     } catch { toast.error('Error al guardar'); setSaving(false); }
   }
@@ -1252,9 +1228,9 @@ function AdquirirModal({
             <div className="bg-gray-50 rounded-xl px-4 py-3 text-xs text-gray-500 space-y-1">
               <p><span className="font-semibold text-gray-700">Código:</span> {lote.codigo}</p>
               <p><span className="font-semibold text-gray-700">Tipo:</span> {lote.tipoProducto?.tipo ?? `#${lote.tipoProductoId}`}</p>
+              {(lote.variedad || muestraVariedad) && <p><span className="font-semibold text-gray-700">Variedad:</span> {lote.variedad || muestraVariedad}</p>}
               {lote.productor && <p><span className="font-semibold text-gray-700">Productor:</span> {lote.productor.nombre} {lote.productor.apellido ?? ''}</p>}
               {lote.campana   && <p><span className="font-semibold text-gray-700">Campaña:</span> {lote.campana.nombre}</p>}
-              {lote.parcela   && <p><span className="font-semibold text-gray-700">Parcela:</span> {lote.parcela.nombre}</p>}
             </div>
           )}
 
@@ -1276,22 +1252,42 @@ function AdquirirModal({
             </div>
             <div>
               <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Sacos (ref.)</label>
-              <input type="number" min="0" value={form.cantidadSacos} onChange={(e) => setForm(f => ({ ...f, cantidadSacos: e.target.value }))} className={cls} />
+              <input type="number" min="0" step="1" value={form.cantidadSacos} onChange={(e) => setForm(f => ({ ...f, cantidadSacos: e.target.value }))} className={cls} />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Fecha adquisición</label>
-            <input type="date" value={form.fechaAdquisicion} onChange={(e) => setForm(f => ({ ...f, fechaAdquisicion: e.target.value }))} className={cls} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Variedad</label>
-              <select value={form.variedad} onChange={(e) => setForm(f => ({ ...f, variedad: e.target.value }))} className={cls}>
-                <option value="">Sin variedad</option>
-                {(lote?.tipoProducto?.tipo === 'CACAO' ? VARIEDADES_CACAO : VARIEDADES_CAFE).map(v => <option key={v} value={v}>{v}</option>)}
+              <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Fecha adquisición</label>
+              <input type="date" value={form.fechaAdquisicion} onChange={(e) => setForm(f => ({ ...f, fechaAdquisicion: e.target.value }))} className={cls} />
+            </div>
+            <div>
+              <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">
+                Parcela
+                {parcelas.length === 0 && lote?.productorId && <span className="ml-1 font-normal text-gray-400">(sin parcelas)</span>}
+              </label>
+              <select
+                value={form.parcelaId}
+                onChange={e => setForm(f => ({ ...f, parcelaId: e.target.value }))}
+                disabled={parcelas.length === 0}
+                className={`${cls} disabled:opacity-50`}
+              >
+                <option value="">— Sin parcela —</option>
+                {parcelas.map(p => <option key={p.id} value={p.id}>{p.nombre}{p.codigo ? ` (${p.codigo})` : ''}</option>)}
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Costo total (S/.)</label>
+              <input
+                type="number" min="0" step="0.01"
+                value={form.costoTotal}
+                onChange={(e) => setForm(f => ({ ...f, costoTotal: e.target.value }))}
+                placeholder="0.00"
+                className={cls}
+              />
             </div>
             <div>
               <label className="block text-[0.65rem] font-bold text-gray-600 uppercase tracking-wider mb-1">Planta</label>
@@ -1319,7 +1315,7 @@ function AdquirirModal({
   );
 }
 
-function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir, labelMode, selected, onToggleSelect }: CardProps) {
+function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir, onPdfAcopio, labelMode, selected, onToggleSelect }: CardProps) {
   const esCacao = (muestra as any).loteFinal?.tipoProductoId === 2
     || (muestra as any).lote?.tipoProducto?.tipo === 'CACAO'
     || esTipoCacao(muestra.tipoMuestra)
@@ -1430,14 +1426,24 @@ function MuestraCard({ muestra, onEvaluaciones, onEditar, onEliminar, onAdquirir
               Proceso: <span className="text-gray-600 font-semibold">{muestra.proceso}</span>
             </p>
           )}
-          {['PRE_ADQUISICION', 'PRE_ALISTADO'].includes(muestra.lote?.estado ?? '') && onAdquirir && (
+          {muestra.lote?.estado === 'PRE_ADQUISICION' && onAdquirir && (
             <button
               onClick={onAdquirir}
               className="mt-1 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.65rem] font-bold text-white uppercase tracking-wide hover:opacity-90 active:scale-[0.97] transition-all"
               style={{ backgroundColor: '#283F34' }}
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-              ACOPIO
+              ACOPIAR
+            </button>
+          )}
+          {muestra.lote?.estado === 'PRE_ALISTADO' && onPdfAcopio && (
+            <button
+              onClick={e => { e.stopPropagation(); onPdfAcopio(); }}
+              className="mt-1 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.65rem] font-bold uppercase tracking-wide hover:opacity-90 active:scale-[0.97] transition-all border"
+              style={{ backgroundColor: '#EFF6FF', color: '#1D4ED8', borderColor: '#BFDBFE' }}
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              PDF ACOPIO
             </button>
           )}
           {muestra.parcela && (
@@ -1657,6 +1663,118 @@ export function MuestrasPage() {
     if (!muestra.lote) return;
     setSelected(muestra);
     setModal('adquirir');
+  }
+
+  async function handlePdfAcopio(muestra: Muestra) {
+    if (!muestra.lote) return;
+    try {
+      const lote = await lotesService.getOne(muestra.lote.id);
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const W = 210, M = 16, CW = W - M * 2;
+      let y = 0;
+
+      // Header
+      doc.setFillColor(40, 63, 52);
+      doc.rect(0, 0, W, 22, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(255, 255, 255);
+      doc.text('COLLECTIVE BEAN', M, 10);
+      doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
+      doc.text('Ficha de Acopio — Ingreso al Almacén', M, 16);
+      doc.setFontSize(7);
+      doc.text(`Generado: ${new Date().toLocaleDateString('es-PE')}`, W - M, 10, { align: 'right' });
+      doc.text(lote.codigo, W - M, 16, { align: 'right' });
+      y = 32;
+
+      // Título del lote
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.setTextColor(40, 63, 52);
+      doc.text(lote.codigo, M, y); y += 7;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(100, 100, 100);
+      doc.text('Ficha de ingreso y datos de acopio', M, y); y += 10;
+
+      // Datos en grid 2x4
+      const infoItems: [string, string][] = [
+        ['Código', lote.codigo],
+        ['Tipo Producto', lote.tipoProducto?.tipo ?? '—'],
+        ['Variedad', lote.variedad ?? (muestra.variedad ?? '—')],
+        ['Campaña', lote.campana?.nombre ?? '—'],
+        ['Productor', lote.productor ? `${lote.productor.nombre}${lote.productor.apellido ? ' ' + lote.productor.apellido : ''}` : '—'],
+        ['Parcela', lote.parcela?.nombre ?? '—'],
+        ['Planta', lote.planta ?? '—'],
+        ['Estado', lote.estado === 'PRE_ALISTADO' ? 'Acopiado' : lote.estado],
+      ];
+
+      const cellW = CW / 2;
+      const cellH = 13;
+      for (let i = 0; i < infoItems.length; i++) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const x = M + col * cellW;
+        const yy = y + row * cellH;
+        doc.setFillColor(col % 2 === 0 ? 247 : 251, col % 2 === 0 ? 251 : 253, col % 2 === 0 ? 247 : 251);
+        doc.rect(x, yy, cellW - 1, cellH - 1, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5); doc.setTextColor(100, 120, 100);
+        doc.text(infoItems[i][0].toUpperCase(), x + 3, yy + 4.5);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(30, 30, 30);
+        doc.text(infoItems[i][1], x + 3, yy + 10);
+      }
+      y += Math.ceil(infoItems.length / 2) * cellH + 8;
+
+      // Separador
+      doc.setDrawColor(220, 235, 220);
+      doc.line(M, y - 4, W - M, y - 4);
+
+      // Datos de acopio destacados
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(40, 63, 52);
+      doc.text('DATOS DE ACOPIO', M, y); y += 7;
+
+      const acropioItems: [string, string][] = [
+        ['Cantidad (kg)', lote.cantidadKg != null ? `${Number(lote.cantidadKg).toFixed(3)} kg` : '—'],
+        ['Sacos (ref.)', lote.cantidadSacos != null ? String(lote.cantidadSacos) : '—'],
+        ['Fecha adquisición', lote.fechaAdquisicion ?? '—'],
+        ['Costo total (S/.)', lote.costoTotal != null ? `S/. ${Number(lote.costoTotal).toFixed(2)}` : '—'],
+      ];
+
+      const aW = CW / 2;
+      for (let i = 0; i < acropioItems.length; i++) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const x = M + col * aW;
+        const yy = y + row * 15;
+        const isKg = acropioItems[i][0] === 'Cantidad (kg)';
+        doc.setFillColor(isKg ? 232 : 248, isKg ? 243 : 252, isKg ? 232 : 248);
+        doc.rect(x, yy, aW - 1, 13, 'F');
+        if (isKg) { doc.setDrawColor(180, 215, 180); doc.rect(x, yy, aW - 1, 13, 'S'); }
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+        doc.setTextColor(isKg ? 40 : 100, isKg ? 100 : 120, isKg ? 40 : 100);
+        doc.text(acropioItems[i][0].toUpperCase(), x + 3, yy + 4.5);
+        doc.setFont('helvetica', isKg ? 'bold' : 'normal'); doc.setFontSize(isKg ? 11 : 9);
+        doc.setTextColor(isKg ? 25 : 30, isKg ? 80 : 30, isKg ? 25 : 30);
+        doc.text(acropioItems[i][1], x + 3, yy + 11);
+      }
+      y += Math.ceil(acropioItems.length / 2) * 15 + 8;
+
+      // Observaciones
+      if (lote.observaciones) {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(40, 63, 52);
+        doc.text('OBSERVACIONES', M, y); y += 5;
+        doc.setFillColor(250, 253, 250);
+        doc.rect(M, y, CW, 20, 'F');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(60, 60, 60);
+        const lines = doc.splitTextToSize(lote.observaciones, CW - 6);
+        doc.text(lines, M + 3, y + 6);
+        y += 26;
+      }
+
+      // Footer
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(7); doc.setTextColor(160, 160, 160);
+      doc.text('Collective Bean — Sistema de Gestión Agrícola', M, 290);
+      doc.text(`Página 1`, W - M, 290, { align: 'right' });
+
+      doc.save(`Acopio_${lote.codigo}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch {
+      // toast already handled externally if needed
+    }
   }
 
   async function confirmarAdquisicion(dto: Partial<CreateLoteDto> & { estado: LoteEstado }) {
@@ -1915,7 +2033,8 @@ export function MuestrasPage() {
                   onEvaluaciones={() => { setSelected(m); setModal('evaluaciones'); }}
                   onEditar={()       => { setSelected(m); setModal('edit'); }}
                   onEliminar={()     => { setSelected(m); setModal('delete'); }}
-                  onAdquirir={['PRE_ADQUISICION', 'PRE_ALISTADO'].includes(m.lote?.estado ?? '') ? () => handleAdquirir(m) : undefined}
+                  onAdquirir={m.lote?.estado === 'PRE_ADQUISICION' ? () => handleAdquirir(m) : undefined}
+                  onPdfAcopio={m.lote?.estado === 'PRE_ALISTADO' ? () => handlePdfAcopio(m) : undefined}
                   labelMode={labelMode}
                   selected={selectedEtiquetas.has(m.id)}
                   onToggleSelect={() => toggleEtiqueta(m.id)}
@@ -1974,6 +2093,7 @@ export function MuestrasPage() {
       {modal === 'adquirir' && selected?.lote && (
         <AdquirirModal
           loteRef={selected.lote}
+          muestraVariedad={selected.variedad ?? undefined}
           onClose={() => { setModal(null); setSelected(null); }}
           onConfirm={confirmarAdquisicion}
         />
