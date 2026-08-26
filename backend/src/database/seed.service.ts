@@ -58,6 +58,17 @@ export class SeedService implements OnApplicationBootstrap {
       await this.ensureTiposProducto();
       return;
     }
+
+    // En producción NUNCA se trunca ni se rellena con datos de demo — eso
+    // borraría datos reales si por cualquier motivo la tabla users queda
+    // vacía (ej. se elimina el único usuario por error). Solo se garantiza
+    // que exista un admin con el que entrar y los tipos de producto base.
+    if (process.env.NODE_ENV === 'production') {
+      await this.seedAdminUser();
+      await this.ensureTiposProducto();
+      return;
+    }
+
     await this.truncateAll();
     await this.seedAdminUser();
     await this.seedClientes();

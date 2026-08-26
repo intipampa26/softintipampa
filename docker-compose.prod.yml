@@ -1,0 +1,69 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: intipampa_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: intipampa
+      POSTGRES_USER: intipampa_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - intipampa_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intipampa_user -d intipampa"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    image: intipampa-backend
+    container_name: intipampa_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: intipampa
+      DATABASE_USER: intipampa_user
+      DATABASE_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: 7d
+      PORT: 3000
+      ENABLE_DELAY: "false"
+      DELAY_MS: 2000
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - intipampa_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    image: intipampa-frontend
+    container_name: intipampa_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - intipampa_network
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  intipampa_network:
+    driver: bridge
