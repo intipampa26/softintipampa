@@ -62,6 +62,7 @@ services:
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot:ro
+      - ./frontend/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - intipampa_network
 
