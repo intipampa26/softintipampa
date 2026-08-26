@@ -20,9 +20,13 @@ import { TipoMovimientoKardex, ReferenciaTipoKardex } from '../kardex/movimiento
 import { MovimientoKardex } from '../kardex/movimiento-kardex.entity';
 import { MermasService } from '../mermas/mermas.service';
 import { TipoMerma } from '../mermas/merma.entity';
+import { Sku } from '../skus/sku.entity';
+import { AsignarSkuDto } from './dto/asignar-sku.dto';
 
- 
+
 const TOLERANCIA_KG = 0.5;
+const RENDIMIENTO_MIN_TIPICO = 60;
+const RENDIMIENTO_MAX_TIPICO = 85;
 
 @Injectable()
 export class LotesFinalesService {
@@ -33,9 +37,25 @@ export class LotesFinalesService {
     private readonly origenRepo: Repository<LoteFinalOrigen>,
     @InjectRepository(Trillado)
     private readonly trilladoRepo: Repository<Trillado>,
+    @InjectRepository(Sku)
+    private readonly skuRepo: Repository<Sku>,
     private readonly kardexService: KardexService,
     private readonly mermasService: MermasService,
   ) {}
+
+  /**
+   * Asigna o corrige el SKU de un LoteFinal. Separado de trillar() porque el
+   * SKU muchas veces se define después (control de calidad, clasificación
+   * comercial) y un LoteFinal ya TRILLADO no puede volver a pasar por
+   * trillar() (R3 bloquea el re-trillado).
+   */
+  async asignarSku(id: number, dto: AsignarSkuDto): Promise<LoteFinal> {
+    await this.findOne(id);
+    const sku = await this.skuRepo.findOne({ where: { id: dto.skuId } });
+    if (!sku) throw new NotFoundException(`SKU #${dto.skuId} no encontrado`);
+    await this.lfRepo.update(id, { skuId: dto.skuId });
+    return this.findOne(id);
+  }
 
   
 
@@ -120,9 +140,34 @@ export class LotesFinalesService {
     return { loteFinal, origenes, trillado };
   }
 
-  
 
-   
+  /** Correlativo único por planta/fecha, formato PPP-YYYYMMDD-N (p.ej. SEL-20260310-1) */
+  private async generateNroLiquidacion(planta: string | undefined, fecha: string): Promise<string> {
+    const prefix = (planta ?? '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase()
+      .slice(0, 3) || 'LIQ';
+    const fechaCompacta = fecha.replace(/-/g, '');
+    const base = `${prefix}-${fechaCompacta}`;
+
+    const last = await this.trilladoRepo
+      .createQueryBuilder('t')
+      .select('t.nroLiquidacion', 'nroLiquidacion')
+      .where('t.nroLiquidacion LIKE :p', { p: `${base}-%` })
+      .orderBy('t.nroLiquidacion', 'DESC')
+      .limit(1)
+      .getRawOne<{ nroLiquidacion: string }>();
+
+    let next = 1;
+    if (last?.nroLiquidacion) {
+      const match = last.nroLiquidacion.match(/-(\d+)$/);
+      if (match) next = parseInt(match[1], 10) + 1;
+    }
+    return `${base}-${next}`;
+  }
+
+
   async trillar(id: number, dto: TrillarDto): Promise<Trillado> {
     const loteFinal = await this.findOne(id);
 
@@ -156,9 +201,14 @@ export class LotesFinalesService {
       );
     }
 
-    
+
     const cantidadQuintales = Math.floor(Number(dto.pesoPfKg) / Number(dto.pesoPorQuintalKg));
     const kgSueltos = Number(dto.pesoPfKg) % Number(dto.pesoPorQuintalKg);
+
+
+    const rendimientoPct = parseFloat(
+      ((Number(dto.pesoPfKg) / Number(loteFinal.cantidadKg)) * 100).toFixed(2),
+    );
 
     // Si se adjunta a un grupo existente, heredar batchId y nroLiquidacion
     let origenBatchId: string | null = null;
@@ -169,6 +219,9 @@ export class LotesFinalesService {
       origenBatchId      = dto.existingBatchId;
       nroLiquidacionFinal = grupoRef.nroLiquidacion ?? dto.nroLiquidacion;
     }
+    if (!nroLiquidacionFinal) {
+      nroLiquidacionFinal = await this.generateNroLiquidacion(dto.planta, dto.fecha);
+    }
 
     const { existingBatchId: _drop, ...dtoSinBatch } = dto;
     const trillado = this.trilladoRepo.create({
@@ -176,28 +229,31 @@ export class LotesFinalesService {
       loteFinalId:       id,
       cantidadQuintales,
       kgSueltos:         parseFloat(kgSueltos.toFixed(3)),
+      rendimientoPct,
       origenBatchId,
       nroLiquidacion:    nroLiquidacionFinal,
     });
     const savedTrillado = await this.trilladoRepo.save(trillado);
 
-    
+
     await this.lfRepo.update(id, {
       estado: LoteFinalEstado.TRILLADO,
       ...(dto.skuId != null ? { skuId: dto.skuId } : {}),
     });
 
-    
-    await this.kardexService.registrar({
-      loteFinalId:    id,
-      tipoMovimiento: TipoMovimientoKardex.INGRESO,
-      cantidadKg:     parseFloat(Number(dto.pesoPfKg).toFixed(3)),
-      referenciaTipo: ReferenciaTipoKardex.TRILLADO,
-      referenciaId:   savedTrillado.id,
-      fecha:          dto.fecha,
-      observaciones:  `Ingreso trillado — Oro verde: ${dto.pesoPfKg} kg`,
-    });
 
+    // El LoteFinal ya tiene registrado su ingreso íntegro (peso pergamino) al ser
+    // creado. La trilla NO agrega material nuevo — solo separa lo que queda como
+    // stock exportable (PF + LE, que permanecen en el saldo) de lo que sale del
+    // lote como merma (LR + LD). Por eso solo se registra una SALIDA por la merma;
+    // nunca un INGRESO adicional por el oro producido (eso duplicaría el peso).
+    //
+    // Por LOTE solo se conoce el peso pergamino que entró y el peso oro que
+    // salió — la merma TOTAL de ese lote es una resta real. Pero el TIPO de
+    // merma (Segunda/Descarte) se clasifica recién después de mezclar toda la
+    // liquidación, no es atribuible a un lote específico. Por eso el kardex
+    // por lote registra un solo movimiento combinado (sin tipo); el detalle
+    // por tipo vive a nivel de la liquidación completa (getGruposTrilla()).
     const mermaTotal = Number(dto.mermaReutilizableKg) + Number(dto.mermaDesechableKg);
     if (mermaTotal > 0) {
       await this.kardexService.registrar({
@@ -207,7 +263,9 @@ export class LotesFinalesService {
         referenciaTipo: ReferenciaTipoKardex.TRILLADO,
         referenciaId:   savedTrillado.id,
         fecha:          dto.fecha,
-        observaciones:  `Merma de trillado — LR: ${dto.mermaReutilizableKg} kg, LD: ${dto.mermaDesechableKg} kg`,
+        observaciones:  `Merma de trillado — LR: ${dto.mermaReutilizableKg} kg, LD: ${dto.mermaDesechableKg} kg ` +
+                         `(Oro verde: ${dto.pesoPfKg} kg, Sobrante exportable: ${dto.sobranteExportableKg} kg, ` +
+                         `Rendimiento: ${rendimientoPct}%)`,
       });
     }
 
@@ -229,10 +287,15 @@ export class LotesFinalesService {
       }
     }
 
+    if (rendimientoPct < RENDIMIENTO_MIN_TIPICO || rendimientoPct > RENDIMIENTO_MAX_TIPICO) {
+      (savedTrillado as any).alertaRendimiento =
+        `Rendimiento ${rendimientoPct}% fuera del rango típico (${RENDIMIENTO_MIN_TIPICO}-${RENDIMIENTO_MAX_TIPICO}%). Verifica los pesos ingresados.`;
+    }
+
     return savedTrillado;
   }
 
-  
+
 
   async findKardex(id: number): Promise<MovimientoKardex[]> {
     await this.findOne(id);
@@ -301,6 +364,12 @@ export class LotesFinalesService {
       batchId = uuidv4();
     }
 
+    // Una liquidación cubre TODO el grupo — se genera una sola vez y se
+    // comparte entre todos los lotes del batch (no una por lote).
+    if (!nroLiquidacionFinal) {
+      nroLiquidacionFinal = await this.generateNroLiquidacion(dto.planta, dto.fecha);
+    }
+
     const trillados: Trillado[] = [];
     const overridesMap = new Map(
       (dto.loteOverrides ?? []).map(o => [o.id, o]),
@@ -318,11 +387,21 @@ export class LotesFinalesService {
       let le: number;
       let skuIdFinal: number | undefined;
 
-      if (override) {
-        // Usar valores específicos del lote
-        lr = parseFloat((Number(override.mermaReutilizableKg ?? 0)).toFixed(3));
-        ld = parseFloat((Number(override.mermaDesechableKg   ?? 0)).toFixed(3));
-        le = parseFloat((Number(override.sobranteExportableKg ?? 0)).toFixed(3));
+      if (override?.pesoPfKg != null) {
+        // Override por lote: solo se pide el Peso Oro (PF) real de ESE lote —
+        // es lo único que se puede medir por lote. La merma total de ese lote
+        // sale de la resta (peso - pf); no se le asigna sobrante exportable
+        // propio. El tipo (Segunda/Descarte) no es atribuible a un lote
+        // individual dentro del batch, así que esa merma se reparte entre LR
+        // y LD usando la MISMA proporción que la merma total de la operación
+        // (es la única referencia de tipo disponible).
+        const pfOverride    = Number(override.pesoPfKg);
+        const mermaLoteTotal = Math.max(0, peso - pfOverride);
+        const mermaAggTotal  = Number(dto.mermaReutilizableKg) + Number(dto.mermaDesechableKg);
+        const propLr = mermaAggTotal > 0 ? Number(dto.mermaReutilizableKg) / mermaAggTotal : 1;
+        lr = parseFloat((mermaLoteTotal * propLr).toFixed(3));
+        ld = parseFloat((mermaLoteTotal - lr).toFixed(3));
+        le = 0;
         skuIdFinal = override.skuId ?? dto.skuId;
       } else if (esUltimo && !overridesMap.size) {
         // El último lote absorbe el residuo decimal para que la suma cuadre exacto
@@ -337,7 +416,7 @@ export class LotesFinalesService {
         lr = parseFloat((Number(dto.mermaReutilizableKg)  * proporcion).toFixed(3));
         ld = parseFloat((Number(dto.mermaDesechableKg)    * proporcion).toFixed(3));
         le = parseFloat((Number(dto.sobranteExportableKg) * proporcion).toFixed(3));
-        skuIdFinal = dto.skuId;
+        skuIdFinal = override?.skuId ?? dto.skuId;
       }
 
       const pf = parseFloat((peso - lr - ld - le).toFixed(3));
@@ -382,7 +461,12 @@ export class LotesFinalesService {
     };
   }
 
-  /** Devuelve todos los grupos de trilla existentes (agrupados por origenBatchId) */
+  /**
+   * Devuelve todos los grupos de trilla existentes (agrupados por
+   * origenBatchId), con el detalle de merma por TIPO a nivel de la
+   * liquidación completa (Segunda/Descarte) — nunca por lote individual,
+   * porque esa clasificación solo existe una vez mezclado todo el batch.
+   */
   async getGruposTrilla(): Promise<{
     batchId: string;
     nroLiquidacion: string | null;
@@ -390,6 +474,8 @@ export class LotesFinalesService {
     planta: string | null;
     lotesCount: number;
     pesoTotalKg: number;
+    mermaReutilizableTotalKg: number;
+    mermaDesechableTotalKg: number;
   }[]> {
     const rows = await this.trilladoRepo
       .createQueryBuilder('t')
@@ -399,6 +485,8 @@ export class LotesFinalesService {
       .addSelect('t.planta',                  'planta')
       .addSelect('COUNT(t.id)',               'lotesCount')
       .addSelect('SUM(t."pesoPfKg" + t."mermaReutilizableKg" + t."mermaDesechableKg" + t."sobranteExportableKg")', 'pesoTotalKg')
+      .addSelect('SUM(t."mermaReutilizableKg")', 'mermaReutilizableTotalKg')
+      .addSelect('SUM(t."mermaDesechableKg")',   'mermaDesechableTotalKg')
       .where('t."origenBatchId" IS NOT NULL')
       .groupBy('t."origenBatchId"')
       .addGroupBy('t."nroLiquidacion"')
@@ -408,6 +496,8 @@ export class LotesFinalesService {
       .getRawMany<{
         batchId: string;
         nroLiquidacion: string | null;
+        mermaReutilizableTotalKg: string;
+        mermaDesechableTotalKg: string;
         fecha: string;
         planta: string | null;
         lotesCount: string;
@@ -421,6 +511,8 @@ export class LotesFinalesService {
       planta:        r.planta,
       lotesCount:    Number(r.lotesCount),
       pesoTotalKg:   parseFloat(Number(r.pesoTotalKg).toFixed(3)),
+      mermaReutilizableTotalKg: parseFloat(Number(r.mermaReutilizableTotalKg).toFixed(3)),
+      mermaDesechableTotalKg:   parseFloat(Number(r.mermaDesechableTotalKg).toFixed(3)),
     }));
   }
 }

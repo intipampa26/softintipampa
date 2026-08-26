@@ -64,6 +64,10 @@ export interface MovimientoKardex {
   saldoKg: number;
   referenciaTipo: string;
   referenciaId: number | null;
+  /** Solo presente cuando referenciaTipo es TRILLADO — número de liquidación de esa trilla */
+  nroLiquidacion?: string | null;
+  /** Solo presente en movimientos MERMA — REUTILIZABLE (Segunda) o DESECHABLE (Descarte) */
+  tipoMerma?: 'REUTILIZABLE' | 'DESECHABLE' | null;
   fecha: string;
   observaciones: string | null;
   createdAt: string;
@@ -100,14 +104,20 @@ export interface GrupoTrilla {
   planta: string | null;
   lotesCount: number;
   pesoTotalKg: number;
+  mermaReutilizableTotalKg: number;
+  mermaDesechableTotalKg: number;
 }
 
 export interface LoteOverride {
   id: number;
   skuId?: number;
-  mermaReutilizableKg?: number;
-  mermaDesechableKg?: number;
-  sobranteExportableKg?: number;
+  /**
+   * Peso Oro (PF) real de ESTE lote — es lo único medible por lote. El tipo
+   * de merma (Segunda/Descarte) no se pide por lote: solo existe a nivel de
+   * toda la liquidación (los campos mermaReutilizableKg/mermaDesechableKg de
+   * BatchTrillarDto), porque se clasifica recién al mezclar el batch.
+   */
+  pesoPfKg?: number;
 }
 
 export interface BatchTrillarDto {

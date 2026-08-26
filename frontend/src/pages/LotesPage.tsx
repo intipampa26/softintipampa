@@ -501,7 +501,11 @@ export function LotesPage() {
   useEffect(() => { load(); }, [load]);
 
   async function handleCreate(dto: Partial<CreateLoteDto>) {
-    await lotesService.create(dto as CreateLoteDto);
+    // Este formulario ya pide cantidad, planta y fecha de adquisición
+    // completas — a diferencia del lote-borrador que se auto-crea al
+    // registrar una muestra en campo, este nace directamente PRE_ALISTADO
+    // (ya "adquirido"), sin pasar por el modal de Acopio.
+    await lotesService.create({ ...dto, estado: 'PRE_ALISTADO' } as CreateLoteDto);
     await load();
   }
 

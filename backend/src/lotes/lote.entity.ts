@@ -91,6 +91,9 @@ export class Lote {
   @Column({ length: 200, nullable: true })
   planta: string | null;
 
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  costoTotal: number | null;
+
   @Column({ type: 'text', nullable: true })
   observaciones: string | null;
 

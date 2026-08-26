@@ -1,14 +1,26 @@
 import {
-  IsString, IsInt, IsOptional,
+  IsString, IsInt, IsOptional, IsEnum,
   IsNumber, IsDateString, Min, MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { LoteEstado } from '../lote.entity';
 
 export class CreateLoteDto {
   @IsString()
   @IsOptional()
   @MaxLength(100)
   codigo?: string;
+
+  /**
+   * Por defecto un lote nace en PRE_ADQUISICION (borrador — p.ej. el lote
+   * placeholder que se auto-crea al registrar una muestra en campo, antes de
+   * confirmar la compra). El formulario "Nuevo lote" del módulo de Lotes ya
+   * pide cantidad, planta y fecha de adquisición completas, así que ese
+   * puede pasar directamente a PRE_ALISTADO sin pasar por el modal de Acopio.
+   */
+  @IsEnum(LoteEstado)
+  @IsOptional()
+  estado?: LoteEstado;
 
   @IsInt()
   @Min(1)
@@ -51,6 +63,12 @@ export class CreateLoteDto {
   @IsOptional()
   @MaxLength(200)
   planta?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  costoTotal?: number;
 
   @IsString()
   @IsOptional()

@@ -79,6 +79,18 @@ export class Trillado {
   @Column({ type: 'decimal', precision: 10, scale: 3 })
   sobranteExportableKg: number;
 
+  @Column({ length: 100, nullable: true })
+  nroLiquidacion: string | null;
+
+
+  @Index()
+  @Column({ length: 40, nullable: true })
+  origenBatchId: string | null;
+
+
+  @Column({ type: 'decimal', precision: 5, scale: 2 })
+  rendimientoPct: number;
+
   @Column({ type: 'text', nullable: true })
   observaciones: string | null;
 

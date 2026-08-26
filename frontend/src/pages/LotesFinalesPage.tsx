@@ -475,7 +475,7 @@ function BatchCacaoModal({ lfs, onClose, onConfirm }: {
   const [resumen,             setResumen]             = useState<BatchTrillarResumen | null>(null);
   const [saving,              setSaving]              = useState(false);
   const [openLoteIds,         setOpenLoteIds]         = useState<Set<number>>(new Set());
-  const [loteOverrides,       setLoteOverrides]       = useState<Map<number, { skuId?: number; lr: string; ld: string; le: string }>>(new Map());
+  const [loteOverrides,       setLoteOverrides]       = useState<Map<number, { skuId?: number; pf: string }>>(new Map());
   const toast = useToast();
 
   const pesoTotal = lfs.reduce((s, l) => s + Number(l.cantidadKg), 0);
@@ -485,14 +485,26 @@ function BatchCacaoModal({ lfs, onClose, onConfirm }: {
   const pf  = pesoTotal - lr - ld - le;
   const rend = pesoTotal > 0 ? ((pf / pesoTotal) * 100) : 0;
 
+  // Por lote solo se puede medir el Peso Oro (PF) real de ese lote. El tipo
+  // de merma (Segunda/Descarte) no es atribuible a un lote individual — solo
+  // existe a nivel de toda la liquidación — así que un override de PF reparte
+  // la merma de ESE lote entre LR/LD usando la misma proporción que la merma
+  // total de la operación (única referencia de tipo disponible).
+  const mermaAggTotal = lr + ld;
+  const propLr = mermaAggTotal > 0 ? lr / mermaAggTotal : 1;
+
   function getLoteMermaRaw(lf: LoteFinal) {
     const peso = Number(lf.cantidadKg);
     const prop = pesoTotal > 0 ? peso / pesoTotal : 0;
     const over = loteOverrides.get(lf.id);
+    if (over?.pf !== undefined && over.pf !== '') {
+      const mermaLoteTotal = Math.max(0, peso - Number(over.pf));
+      return { lrL: mermaLoteTotal * propLr, ldL: mermaLoteTotal * (1 - propLr), leL: 0 };
+    }
     return {
-      lrL: over?.lr ? Number(over.lr) : lr * prop,
-      ldL: over?.ld ? Number(over.ld) : ld * prop,
-      leL: over?.le ? Number(over.le) : le * prop,
+      lrL: lr * prop,
+      ldL: ld * prop,
+      leL: le * prop,
     };
   }
 
@@ -535,13 +547,11 @@ function BatchCacaoModal({ lfs, onClose, onConfirm }: {
     try {
       const overridesPayload: LoteOverride[] = [];
       for (const [id, over] of loteOverrides) {
-        if (over.skuId || over.lr || over.ld || over.le) {
+        if (over.skuId || (over.pf !== undefined && over.pf !== '')) {
           overridesPayload.push({
             id,
-            skuId: over.skuId,
-            mermaReutilizableKg: over.lr ? Number(over.lr) : undefined,
-            mermaDesechableKg:   over.ld ? Number(over.ld) : undefined,
-            sobranteExportableKg: over.le ? Number(over.le) : undefined,
+            skuId:    over.skuId,
+            pesoPfKg: over.pf !== undefined && over.pf !== '' ? Number(over.pf) : undefined,
           });
         }
       }
@@ -629,17 +639,26 @@ function BatchCacaoModal({ lfs, onClose, onConfirm }: {
             {lfs.map(lf => {
               const peso = Number(lf.cantidadKg);
               const isOpen = openLoteIds.has(lf.id);
-              const over = loteOverrides.get(lf.id) ?? { lr: '', ld: '', le: '' };
+              const over = loteOverrides.get(lf.id) ?? { pf: '' };
               const { lrL, ldL, leL } = getLoteMermaRaw(lf);
               const pfLote = peso - lrL - ldL - leL;
               const rendLote = peso > 0 ? (pfLote / peso) * 100 : 0;
-              const hasOverride = !!(over.skuId || over.lr || over.ld || over.le);
+              const hasOverride = !!(over.skuId || over.pf);
               const prop = pesoTotal > 0 ? peso / pesoTotal : 0;
+              const pfDefault = peso * prop > 0 ? (peso - lr * prop - ld * prop - le * prop) : peso;
 
               function setOver(partial: Partial<typeof over>) {
                 setLoteOverrides(prev => {
                   const next = new Map(prev);
                   next.set(lf.id, { ...over, ...partial });
+                  return next;
+                });
+              }
+
+              function clearOverride() {
+                setLoteOverrides(prev => {
+                  const next = new Map(prev);
+                  next.delete(lf.id);
                   return next;
                 });
               }
@@ -651,14 +670,24 @@ function BatchCacaoModal({ lfs, onClose, onConfirm }: {
                     onClick={() => setOpenLoteIds(prev => { const n = new Set(prev); n.has(lf.id) ? n.delete(lf.id) : n.add(lf.id); return n; })}
                     className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                       <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${isOpen ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                       </svg>
-                      <span className="font-semibold text-gray-700 text-xs">{lf.codigo}</span>
-                      {hasOverride && (
-                        <span className="px-1.5 py-0.5 rounded-full text-[0.55rem] font-bold bg-blue-100 text-blue-600">Config. propia</span>
-                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-700 text-xs">{lf.codigo}</span>
+                          {hasOverride && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[0.55rem] font-bold bg-blue-100 text-blue-600">Config. propia</span>
+                          )}
+                        </div>
+                        {(lf.variedad || lf.productor) && (
+                          <p className="text-[0.65rem] text-gray-400 truncate">
+                            {lf.variedad ?? '—'}
+                            {lf.productor && ` · ${lf.productor.nombre}${lf.productor.apellido ? ' ' + lf.productor.apellido : ''}`}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-gray-400 tabular-nums text-xs">{peso.toFixed(3)} kg</span>
@@ -668,6 +697,15 @@ function BatchCacaoModal({ lfs, onClose, onConfirm }: {
 
                   {isOpen && (
                     <div className="px-3 py-3 bg-white space-y-3 border-t border-gray-100">
+                      {hasOverride && (
+                        <button
+                          type="button"
+                          onClick={clearOverride}
+                          className="text-[0.65rem] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          Restablecer a prorrateo global
+                        </button>
+                      )}
                       <div>
                         <label className="block text-[0.65rem] font-semibold text-gray-500 uppercase tracking-wider mb-1">SKU del lote</label>
                         <select value={over.skuId ?? ''} onChange={e => setOver({ skuId: e.target.value ? Number(e.target.value) : undefined })} className={cls}>
@@ -676,27 +714,24 @@ function BatchCacaoModal({ lfs, onClose, onConfirm }: {
                         </select>
                       </div>
                       <div>
-                        <p className="text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                          Merma por lote <span className="normal-case font-normal text-gray-400">(vacío = prorrateo global)</span>
-                        </p>
-                        <div className="grid grid-cols-3 gap-2">
-                          {(['lr', 'ld', 'le'] as const).map(key => {
-                            const labels = { lr: 'LR (kg)', ld: 'LD (kg)', le: 'LE (kg)' };
-                            const defaults = { lr: lr * prop, ld: ld * prop, le: le * prop };
-                            return (
-                              <div key={key}>
-                                <label className="block text-[0.6rem] font-semibold text-gray-400 uppercase mb-0.5">{labels[key]}</label>
-                                <input
-                                  type="number" step="0.001" min="0"
-                                  value={over[key]}
-                                  onChange={e => setOver({ [key]: e.target.value })}
-                                  className={numCls}
-                                  placeholder={defaults[key].toFixed(3)}
-                                />
-                              </div>
-                            );
-                          })}
+                        <label className="block text-[0.65rem] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                          Peso Oro (PF) de este lote <span className="normal-case font-normal text-gray-400">(vacío = prorrateo global)</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number" step="0.001" min="0" max={peso}
+                            value={over.pf}
+                            onChange={e => setOver({ pf: e.target.value })}
+                            className={`${numCls} pr-9`}
+                            placeholder={pfDefault.toFixed(3)}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">kg</span>
                         </div>
+                        <p className="text-[0.6rem] text-gray-400 mt-1">
+                          Por lote solo se conoce cuánto pergamino entró y cuánto oro salió — la merma de este lote
+                          ({(peso - Number(over.pf || pfDefault)).toFixed(3)} kg) se reparte entre Segunda/Descarte
+                          usando la proporción de la operación completa, porque ese detalle no es por lote.
+                        </p>
                       </div>
                       <div className={`rounded-lg px-3 py-2 text-xs flex justify-between items-center ${pfLote >= 0 ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
                         <span className="text-gray-600">PF: <strong className="tabular-nums">{pfLote.toFixed(3)} kg</strong></span>
@@ -746,7 +781,8 @@ function BatchCacaoModal({ lfs, onClose, onConfirm }: {
                   <p><strong>Liquidación:</strong> {grupoSeleccionado.nroLiquidacion ?? '(sin número)'}</p>
                   <p><strong>Fecha:</strong> {grupoSeleccionado.fecha} · <strong>Planta:</strong> {grupoSeleccionado.planta ?? '—'}</p>
                   <p><strong>Lotes ya en el grupo:</strong> {grupoSeleccionado.lotesCount} · <strong>Peso acumulado:</strong> {grupoSeleccionado.pesoTotalKg.toFixed(3)} kg</p>
-                  <p className="text-blue-500 mt-1">Los nuevos lotes heredarán el nro. de liquidación de este grupo.</p>
+                  <p><strong>Merma Segunda:</strong> {grupoSeleccionado.mermaReutilizableTotalKg.toFixed(3)} kg · <strong>Merma Descarte:</strong> {grupoSeleccionado.mermaDesechableTotalKg.toFixed(3)} kg</p>
+                  <p className="text-blue-500 mt-1">Los nuevos lotes heredarán el nro. de liquidación de este grupo. La merma total de la liquidación se irá acumulando con cada lote agregado.</p>
                 </div>
               )}
             </div>
@@ -892,15 +928,26 @@ function DetalleModal({ id, onClose }: { id: number; onClose: () => void }) {
           {tab === 'kardex' && (
             kardex.length === 0
               ? <p className="text-sm text-gray-400 italic">Sin movimientos registrados.</p>
-              : <div className="overflow-x-auto rounded-xl border border-gray-100"><table className="w-full text-xs"><thead><tr className="bg-gray-50 border-b"><th className="px-3 py-2 text-left text-gray-500 font-semibold">Fecha</th><th className="px-3 py-2 text-left text-gray-500 font-semibold">Tipo</th><th className="px-3 py-2 text-right text-gray-500 font-semibold">Cantidad</th><th className="px-3 py-2 text-right text-gray-500 font-semibold">Saldo</th></tr></thead>
-                <tbody className="divide-y divide-gray-50">{kardex.map(m => (
+              : <div className="overflow-x-auto rounded-xl border border-gray-100"><table className="w-full text-xs"><thead><tr className="bg-gray-50 border-b"><th className="px-3 py-2 text-left text-gray-500 font-semibold">Liq. Trilla</th><th className="px-3 py-2 text-left text-gray-500 font-semibold">Fecha</th><th className="px-3 py-2 text-left text-gray-500 font-semibold">Tipo</th><th className="px-3 py-2 text-right text-gray-500 font-semibold">Cantidad</th><th className="px-3 py-2 text-right text-gray-500 font-semibold">Saldo</th></tr></thead>
+                <tbody className="divide-y divide-gray-50">{kardex.map((m, idx) => {
+                  const liq = m.nroLiquidacion;
+                  const liqIsRunStart = !liq || idx === 0 || kardex[idx - 1].nroLiquidacion !== liq;
+                  let liqRowSpan = 1;
+                  if (liq && liqIsRunStart) {
+                    while (idx + liqRowSpan < kardex.length && kardex[idx + liqRowSpan].nroLiquidacion === liq) liqRowSpan++;
+                  }
+                  return (
                   <tr key={m.id}>
+                    {liqIsRunStart && (
+                      <td rowSpan={liqRowSpan} className="px-3 py-2 text-gray-500 font-mono align-middle bg-gray-50/50">{liq ?? '—'}</td>
+                    )}
                     <td className="px-3 py-2 text-gray-600">{m.fecha}</td>
                     <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded-full text-[0.6rem] font-bold uppercase ${m.tipoMovimiento === 'INGRESO' ? 'bg-green-100 text-green-700' : m.tipoMovimiento === 'MERMA' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>{m.tipoMovimiento}</span></td>
                     <td className={`px-3 py-2 text-right tabular-nums font-semibold ${m.tipoMovimiento === 'INGRESO' ? 'text-green-600' : 'text-red-500'}`}>{m.tipoMovimiento === 'INGRESO' ? '+' : '-'}{Number(m.cantidadKg).toFixed(2)}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-black text-gray-800">{Number(m.saldoKg).toFixed(2)}</td>
                   </tr>
-                ))}</tbody></table></div>
+                  );
+                })}</tbody></table></div>
           )}
         </div>
       </div>
@@ -1201,7 +1248,7 @@ export function LotesFinalesPage() {
                         <input type="checkbox" checked={allCacaoSelected} onChange={e => setSelectedIds(e.target.checked ? new Set(cacaoPendienteIds) : new Set())} className="w-3.5 h-3.5 accent-green-700 cursor-pointer" title="Seleccionar todos los pendientes" />
                       )}
                     </th>
-                    {['Código LF', 'Tipo', 'SKU', 'Variedad', 'Productor', 'Cantidad (kg)', 'Estado', 'Campaña', ''].map(h => (
+                    {['Tipo', 'SKU', 'Variedad', 'Productor', 'Cantidad (kg)', 'Estado', 'Campaña', ''].map(h => (
                       <th key={h} className="text-left px-5 py-3 text-[0.68rem] font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -1214,7 +1261,6 @@ export function LotesFinalesPage() {
                           <input type="checkbox" checked={selectedIds.has(lf.id)} onChange={e => setSelectedIds(prev => { const n = new Set(prev); e.target.checked ? n.add(lf.id) : n.delete(lf.id); return n; })} className="w-3.5 h-3.5 accent-green-700 cursor-pointer" />
                         )}
                       </td>
-                      <td className="px-5 py-4 font-semibold text-gray-800">{lf.codigo}</td>
                       <td className="px-5 py-4 text-xs font-bold text-gray-600">{lf.tipoProducto?.tipo ?? `#${lf.tipoProductoId}`}</td>
                       <td className="px-5 py-4 text-xs text-gray-500">{lf.sku?.nombre ?? '—'}</td>
                       <td className="px-5 py-4 text-xs text-gray-500">{lf.variedad ?? '—'}</td>

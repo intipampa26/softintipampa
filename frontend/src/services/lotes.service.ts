@@ -20,6 +20,7 @@ export interface Lote {
   lotePadreId: number | null;
   variedad: string | null;
   planta: string | null;
+  costoTotal: number | null;
   observaciones: string | null;
   activo: boolean;
   createdAt: string;
@@ -35,6 +36,7 @@ export interface LoteFinalOrigen {
 
 export interface CreateLoteDto {
   codigo?: string;
+  estado?: LoteEstado;
   tipoProductoId: number;
   campanaId?: number;
   productorId: number;
@@ -44,6 +46,7 @@ export interface CreateLoteDto {
   fechaAdquisicion?: string;
   variedad?: string;
   planta?: string;
+  costoTotal?: number;
   observaciones?: string;
 }
 

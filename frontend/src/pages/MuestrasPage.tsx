@@ -929,7 +929,7 @@ function MuestraFormModal({ initial, campanas, tiposProducto, onClose, onSave }:
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Proceso</label>
                 <select value={form.proceso ?? ''} onChange={(e) => set('proceso')(e.target.value)} className={cls}>
                   <option value="">Sin proceso</option>
-                  {['PROCESO','LAVADO','HONEY','NATURAL','ASD','DOBLE FERMENTO','FERMENTACIÓN PROLONGADO','CAJONES FERMENTADORES','EXPERIMENTAL','OTRO'].map(p => <option key={p} value={p}>{p}</option>)}
+                  {['LAVADO','HONEY','NATURAL','ASD','DOBLE FERMENTO','FERMENTACIÓN PROLONGADO','CAJONES FERMENTADORES','EXPERIMENTAL','OTRO'].map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
               <div>

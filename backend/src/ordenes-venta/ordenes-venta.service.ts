@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { join } from 'path';
@@ -11,7 +11,7 @@ import { OrdenAlistado }        from './orden-alistado.entity';
 import { OrdenExportacion }     from './orden-exportacion.entity';
 import { OrdenPostVenta }       from './orden-post-venta.entity';
 import { Muestra }              from '../muestras/muestra.entity';
-import { LoteFinal }            from '../lotes-finales/lote-final.entity';
+import { LoteFinal, LoteFinalEstado } from '../lotes-finales/lote-final.entity';
 import { CreateOrdenVentaDto }  from './dto/create-orden-venta.dto';
 import { UpdateOrdenVentaDto }  from './dto/update-orden-venta.dto';
 import { FilterOrdenesDto }     from './dto/filter-ordenes.dto';
@@ -95,6 +95,27 @@ export class OrdenesVentaService {
 
   async remove(id: number): Promise<{ ok: boolean }> {
     const ov = await this.findOne(id);
+
+    // Si la orden ya había descontado stock (venta registrada en kardex al
+    // pasar por exportación), anularla debe devolver ese stock — si no, los
+    // kg quedan "perdidos" para siempre en un lote cuya venta ya no existe.
+    const yaRegistradoPorLote = await this.kardexService.netPorReferenciaAgrupado(
+      ReferenciaTipoKardex.VENTA, id,
+    );
+    const fechaHoy = new Date().toISOString().slice(0, 10);
+    for (const [lfId, yaRegistrado] of yaRegistradoPorLote) {
+      if (Math.abs(yaRegistrado) < 0.001) continue;
+      await this.kardexService.registrar({
+        loteFinalId:    lfId,
+        tipoMovimiento: yaRegistrado > 0 ? TipoMovimientoKardex.INGRESO : TipoMovimientoKardex.SALIDA,
+        cantidadKg:     Math.abs(yaRegistrado),
+        referenciaTipo: ReferenciaTipoKardex.VENTA,
+        referenciaId:   id,
+        fecha:          fechaHoy,
+        observaciones:  `Orden ${ov.codigo} anulada — reversión de venta`,
+      });
+    }
+
     ov.activo = false;
     await this.repo.save(ov);
     return { ok: true };
@@ -105,36 +126,67 @@ export class OrdenesVentaService {
 
     if (
       dto.etapa === EtapaOrden.EXPORTACION &&
-      (dto.estado === EstadoEtapa.EN_PROCESO || dto.estado === EstadoEtapa.COMPLETADO) &&
-      ov.lote &&
-      Number(ov.cantidadKg) > 0
+      (dto.estado === EstadoEtapa.EN_PROCESO || dto.estado === EstadoEtapa.COMPLETADO)
     ) {
-      const loteFinal = await this.loteFinalRepo.findOne({ where: { codigo: ov.lote } });
-      if (loteFinal) {
-        const yaRegistrado = await this.kardexService.netSalidaPorReferencia(
-          ReferenciaTipoKardex.VENTA,
-          id,
-          loteFinal.id,
-        );
-        if (yaRegistrado === 0) {
-          const mov = await this.kardexService.registrar({
-            loteFinalId:    loteFinal.id,
-            tipoMovimiento: TipoMovimientoKardex.SALIDA,
-            cantidadKg:     Number(ov.cantidadKg),
-            referenciaTipo: ReferenciaTipoKardex.VENTA,
-            referenciaId:   id,
-            fecha:          dto.fecha ?? new Date().toISOString().slice(0, 10),
-            observaciones:  `Venta exportación ${ov.codigo} — ${ov.cliente}`,
-          });
-          // Auto-fill kardexNro and kardexRegistrado in orden_exportacion
-          let exp = await this.exportacionRepo.findOne({ where: { ordenVentaId: id } });
-          if (!exp) {
-            exp = this.exportacionRepo.create({ ordenVentaId: id });
-          }
-          exp.kardexNro        = String(mov.id);
-          exp.kardexRegistrado = true;
-          await this.exportacionRepo.save(exp);
-        }
+      const alistado = await this.alistadoRepo.findOne({ where: { ordenVentaId: id } });
+      const lotesAsignados: any[] = alistado?.lotesAsignados ?? [];
+      const fecha = dto.fecha ?? new Date().toISOString().slice(0, 10);
+
+      // Se agrupa por loteFinalId porque un mismo lote podría aparecer más de
+      // una vez en lotesAsignados (envíos parciales) — el kardex debe reflejar
+      // el total, no cada fila por separado.
+      const totalesPorLote = new Map<number, { cantidadKg: number; codigo: string }>();
+      for (const item of lotesAsignados) {
+        const lfId = Number(item.loteFinalId);
+        const cantidadKg = Number(item.cantidadKg);
+        if (!lfId || cantidadKg <= 0) continue;
+        const prev = totalesPorLote.get(lfId);
+        totalesPorLote.set(lfId, {
+          cantidadKg: (prev?.cantidadKg ?? 0) + cantidadKg,
+          codigo: item.codigo ?? prev?.codigo ?? '',
+        });
+      }
+
+      // Lotes que YA tenían una salida registrada para esta orden en algún
+      // momento anterior — incluye los que fueron QUITADOS de lotesAsignados,
+      // no solo los que siguen en la lista. Sin esto, remover una fila (en
+      // vez de solo bajarle la cantidad) dejaba su salida huérfana para
+      // siempre.
+      const yaRegistradoPorLote = await this.kardexService.netPorReferenciaAgrupado(
+        ReferenciaTipoKardex.VENTA, id,
+      );
+      const todosLosLoteIds = new Set([...totalesPorLote.keys(), ...yaRegistradoPorLote.keys()]);
+
+      for (const lfId of todosLosLoteIds) {
+        const objetivo     = totalesPorLote.get(lfId)?.cantidadKg ?? 0;
+        const codigo       = totalesPorLote.get(lfId)?.codigo ?? '';
+        const yaRegistrado = yaRegistradoPorLote.get(lfId) ?? 0;
+
+        // Reconciliación por delta (igual que en preventa): si la cantidad
+        // asignada cambió, o el lote fue quitado por completo (objetivo=0),
+        // se ajusta con un movimiento adicional en vez de ignorarlo.
+        const diff = objetivo - yaRegistrado;
+        if (Math.abs(diff) < 0.001) continue;
+
+        await this.kardexService.registrar({
+          loteFinalId:    lfId,
+          tipoMovimiento: diff > 0 ? TipoMovimientoKardex.SALIDA : TipoMovimientoKardex.INGRESO,
+          cantidadKg:     Math.abs(diff),
+          referenciaTipo: ReferenciaTipoKardex.VENTA,
+          referenciaId:   id,
+          fecha,
+          observaciones:  objetivo === 0
+            ? `Venta exportación ${ov.codigo} — ${ov.cliente ?? ''} · lote retirado de la asignación (reversión)`
+            : `Venta exportación ${ov.codigo} — ${ov.cliente ?? ''} · ${codigo}` +
+              (yaRegistrado !== 0 ? ' (ajuste)' : ''),
+        });
+      }
+
+      if (lotesAsignados.length > 0) {
+        let exp = await this.exportacionRepo.findOne({ where: { ordenVentaId: id } });
+        if (!exp) exp = this.exportacionRepo.create({ ordenVentaId: id });
+        exp.kardexRegistrado = true;
+        await this.exportacionRepo.save(exp);
       }
     }
 
@@ -149,9 +201,17 @@ export class OrdenesVentaService {
     const ETAPA_ORDER = ['preventa', 'alistado', 'exportacion', 'post_venta'];
     const currentIdx  = ETAPA_ORDER.indexOf(ov.etapaActual ?? 'preventa');
     const newIdx      = ETAPA_ORDER.indexOf(dto.etapa);
-    if ((dto.estado === EstadoEtapa.EN_PROCESO || dto.estado === EstadoEtapa.COMPLETADO) && newIdx >= currentIdx) {
-      ov.etapaActual = dto.etapa;
+
+    if (dto.estado === EstadoEtapa.EN_PROCESO || dto.estado === EstadoEtapa.COMPLETADO) {
+      if (newIdx >= currentIdx) ov.etapaActual = dto.etapa;
+    } else if (dto.estado === EstadoEtapa.PENDIENTE && dto.etapa === ov.etapaActual) {
+      const lastActive = [...ETAPA_ORDER].reverse().find(e =>
+        e !== dto.etapa &&
+        (ov.etapas[e]?.estado === EstadoEtapa.EN_PROCESO || ov.etapas[e]?.estado === EstadoEtapa.COMPLETADO),
+      );
+      ov.etapaActual = (lastActive ?? 'preventa') as EtapaOrden;
     }
+
     return this.repo.save(ov);
   }
 
@@ -292,6 +352,72 @@ export class OrdenesVentaService {
 
   async upsertAlistado(ordenId: number, dto: UpsertAlistadoDto): Promise<OrdenAlistado> {
     await this.findOne(ordenId);
+    if (dto.lotesAsignados?.length) {
+      const incomingIds: number[] = dto.lotesAsignados.map((l: any) => Number(l.loteFinalId)).filter(Boolean);
+
+      // El flujo de venta (gestión) solo puede alistar lo que la trilla ya
+      // liquidó como stock exportable: el LoteFinal debe estar TRILLADO y la
+      // cantidad asignada no puede superar el saldo real disponible en kardex.
+      const lotes = await this.loteFinalRepo.find({ where: { id: In(incomingIds) } });
+      const loteMap = new Map(lotes.map(l => [l.id, l]));
+
+      // Un mismo lote puede aparecer más de una vez (p.ej. despachos parciales
+      // en distintas fechas) — hay que validar el ESTADO por fila pero el
+      // SALDO contra la suma de todas las filas de ese lote, no cada una por
+      // separado (si no, dos filas de 400kg pasarían un saldo de 600kg).
+      const cantidadPorLote = new Map<number, number>();
+      for (const item of dto.lotesAsignados as any[]) {
+        const lfId = Number(item.loteFinalId);
+        if (!lfId) continue;
+        const lf = loteMap.get(lfId);
+        if (!lf) throw new NotFoundException(`LoteFinal #${lfId} no encontrado`);
+        if (lf.estado !== LoteFinalEstado.TRILLADO) {
+          throw new BadRequestException(
+            `El lote final ${lf.codigo} aún no ha sido trillado (estado actual: ${lf.estado}). ` +
+            `Solo se pueden alistar para venta lotes ya liquidados en trilla.`,
+          );
+        }
+        cantidadPorLote.set(lfId, (cantidadPorLote.get(lfId) ?? 0) + Number(item.cantidadKg ?? 0));
+      }
+
+      for (const [lfId, cantidadKg] of cantidadPorLote) {
+        if (cantidadKg <= 0) continue;
+        const lf = loteMap.get(lfId)!;
+        const saldo = await this.kardexService.saldoActual(lfId);
+        // Si esta misma orden ya había registrado una SALIDA por venta de este
+        // lote (p.ej. al avanzar a exportación), esos kg ya no están en el
+        // saldo pero siguen "reservados" por esta orden — deben contar como
+        // disponibles al re-guardar el alistado.
+        const yaReservadoPorEstaOrden = await this.kardexService.netSalidaPorReferencia(
+          ReferenciaTipoKardex.VENTA, ordenId, lfId,
+        );
+        const disponible = saldo + yaReservadoPorEstaOrden;
+        if (cantidadKg > disponible + 0.5) {
+          throw new BadRequestException(
+            `Se intenta alistar ${cantidadKg} kg del lote ${lf.codigo}, pero el saldo disponible ` +
+            `en kardex es de ${disponible} kg.`,
+          );
+        }
+      }
+
+      // Solo cuentan como conflicto los alistados de órdenes ACTIVAS — una
+      // orden anulada (remove()) ya devolvió su stock al kardex, así que su
+      // fila de alistado (que nunca se limpia) no debe seguir bloqueando el
+      // lote para siempre.
+      const conflicting = await this.alistadoRepo
+        .createQueryBuilder('oa')
+        .innerJoin('ordenes_venta', 'ov2', 'ov2.id = oa."ordenVentaId"')
+        .where('oa.ordenVentaId != :ordenId', { ordenId })
+        .andWhere('ov2.activo = true')
+        .getMany();
+      for (const other of conflicting) {
+        const otherLotes: any[] = other.lotesAsignados ?? [];
+        const dup = otherLotes.find((l: any) => incomingIds.includes(Number(l.loteFinalId)));
+        if (dup) throw new BadRequestException(
+          `El lote final ${dup.codigo ?? dup.loteFinalId} ya está asignado a otra orden de venta.`,
+        );
+      }
+    }
     let row = await this.alistadoRepo.findOne({ where: { ordenVentaId: ordenId } });
     if (!row) row = this.alistadoRepo.create({ ordenVentaId: ordenId });
     Object.assign(row, dto);

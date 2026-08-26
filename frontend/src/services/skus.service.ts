@@ -21,6 +21,11 @@ class SkusService {
       return [];
     }
   }
+
+  async create(nombre: string, descripcion?: string): Promise<Sku> {
+    const { data } = await api.post('/skus', { nombre, descripcion });
+    return data;
+  }
 }
 
 export const skusService = new SkusService();

@@ -253,7 +253,8 @@ export function KardexPage() {
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '980px' }}>
             <thead>
               <tr>
-                <th style={{ ...TH, width: '44px' }} rowSpan={2}>#</th>
+                <th style={{ ...TH, width: '95px' }} rowSpan={2}>LIQ. TRILLA</th>
+                <th style={{ ...TH, width: '110px' }} rowSpan={2}>TIPO MERMA</th>
                 <th style={{ ...TH, width: '90px' }} rowSpan={2}>FECHA</th>
                 <th style={{ ...TH, minWidth: '130px' }} rowSpan={2}>LOTE FINAL</th>
                 <th style={{ ...TH, width: '90px' }} rowSpan={2}>TIPO ORIGEN</th>
@@ -276,13 +277,21 @@ export function KardexPage() {
             <tbody>
               {movimientos.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={13} style={{ ...TD, textAlign: 'center', padding: '48px', color: '#9CA3AF' }}>
+                  <td colSpan={14} style={{ ...TD, textAlign: 'center', padding: '48px', color: '#9CA3AF' }}>
                     Sin movimientos registrados
                   </td>
                 </tr>
               ) : (
                 movimientos.map((m, idx) => {
-                  const nOper   = (page - 1) * limit + idx + 1;
+                  // Agrupa filas consecutivas de la misma liquidación de trilla
+                  // bajo una sola celda combinada (rowSpan), en vez de repetir
+                  // el número en cada fila.
+                  const liq = m.nroLiquidacion;
+                  const liqIsRunStart = !liq || idx === 0 || movimientos[idx - 1].nroLiquidacion !== liq;
+                  let liqRowSpan = 1;
+                  if (liq && liqIsRunStart) {
+                    while (idx + liqRowSpan < movimientos.length && movimientos[idx + liqRowSpan].nroLiquidacion === liq) liqRowSpan++;
+                  }
                   const isEntry = m.tipoMovimiento === 'INGRESO';
                   const isExit  = m.tipoMovimiento === 'SALIDA';
                   const isMerma = m.tipoMovimiento === 'MERMA';
@@ -301,9 +310,27 @@ export function KardexPage() {
 
                   return (
                     <tr key={m.id} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#F9FAFB' }}>
-                      <td style={{ ...TD, textAlign: 'center', fontWeight: 600, color: '#6B7280', fontSize: '0.7rem' }}>
-                        {nOper}
-                      </td>
+                      {liqIsRunStart && (
+                        <td rowSpan={liqRowSpan} style={{ ...TD, textAlign: 'center', fontSize: '0.68rem', verticalAlign: 'middle', backgroundColor: '#F8FDF9' }}>
+                          {liq ? (
+                            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1A2B23' }}>{liq}</span>
+                          ) : <span style={{ color: '#9CA3AF' }}>—</span>}
+                        </td>
+                      )}
+                      {liqIsRunStart && (
+                        <td rowSpan={liqRowSpan} style={{ ...TD, textAlign: 'center', fontSize: '0.62rem', verticalAlign: 'middle', backgroundColor: '#F8FDF9' }}>
+                          {liq ? (
+                            <span style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'center' }}>
+                              <span style={{ color: '#92400E', fontWeight: 700 }}>
+                                Segunda: {fmtKg(m.liqMermaReutilizableKg ?? 0)}
+                              </span>
+                              <span style={{ color: '#991B1B', fontWeight: 700 }}>
+                                Descarte: {fmtKg(m.liqMermaDesechableKg ?? 0)}
+                              </span>
+                            </span>
+                          ) : <span style={{ color: '#9CA3AF' }}>—</span>}
+                        </td>
+                      )}
                       <td style={{ ...TD, textAlign: 'center', whiteSpace: 'nowrap', fontSize: '0.68rem' }}>
                         {fmtFechaHora(m.fecha, m.horaEntrada)}
                       </td>
@@ -475,7 +502,23 @@ export function KardexPage() {
                         Origen: {origen}
                       </span>
                     )}
+                    {m.nroLiquidacion && (
+                      <span className="text-[0.65rem] font-mono font-semibold text-gray-600 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md">
+                        Liq: {m.nroLiquidacion}
+                      </span>
+                    )}
                   </div>
+
+                  {m.nroLiquidacion && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[0.6rem] font-mono font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-md">
+                        Segunda: {fmtKg(m.liqMermaReutilizableKg ?? 0)} kg
+                      </span>
+                      <span className="text-[0.6rem] font-mono font-semibold text-red-700 bg-red-50 border border-red-100 px-2 py-0.5 rounded-md">
+                        Descarte: {fmtKg(m.liqMermaDesechableKg ?? 0)} kg
+                      </span>
+                    </div>
+                  )}
 
                   {m.observaciones && (
                     <p className="text-[0.65rem] text-gray-400 leading-relaxed">{m.observaciones}</p>

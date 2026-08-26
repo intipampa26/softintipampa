@@ -44,6 +44,12 @@ export class UpdateLoteDto {
   @MaxLength(200)
   planta?: string;
 
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  costoTotal?: number;
+
   @IsString()
   @IsOptional()
   observaciones?: string;

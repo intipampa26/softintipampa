@@ -7,9 +7,15 @@ import { Type } from 'class-transformer';
 export class LoteOverrideDto {
   @IsInt() @Type(() => Number) id: number;
   @IsOptional() @IsInt() @Type(() => Number) skuId?: number;
-  @IsOptional() @IsNumber() @Min(0) @Type(() => Number) mermaReutilizableKg?: number;
-  @IsOptional() @IsNumber() @Min(0) @Type(() => Number) mermaDesechableKg?: number;
-  @IsOptional() @IsNumber() @Min(0) @Type(() => Number) sobranteExportableKg?: number;
+  /**
+   * Por lote solo se conoce peso pergamino (entrada) y peso oro (salida) — la
+   * merma total de ese lote sale de la resta. El TIPO de merma (Segunda vs.
+   * Descarte) no es atribuible a un lote individual dentro de un batch: se
+   * clasifica recién al mezclar toda la liquidación, así que ese detalle
+   * sigue siendo solo agregado (mermaReutilizableKg/mermaDesechableKg a
+   * nivel de BatchTrillarDto), nunca por lote.
+   */
+  @IsOptional() @IsNumber() @Min(0) @Type(() => Number) pesoPfKg?: number;
 }
 
 export class BatchTrillarDto {

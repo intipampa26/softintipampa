@@ -26,6 +26,15 @@ export interface MovimientoKardex {
   saldoKg: number;
   referenciaTipo: string;
   referenciaId: number | null;
+  /** Solo presente cuando referenciaTipo es TRILLADO — número de liquidación de esa trilla */
+  nroLiquidacion?: string | null;
+  /**
+   * Totales de merma por TIPO de TODA la liquidación (no del lote individual)
+   * — Segunda y Descarte solo se clasifican al mezclar el batch completo.
+   * Presentes solo cuando referenciaTipo es TRILLADO.
+   */
+  liqMermaReutilizableKg?: number;
+  liqMermaDesechableKg?: number;
   fecha: string;
   horaEntrada: string | null;
   horaSalida: string | null;
