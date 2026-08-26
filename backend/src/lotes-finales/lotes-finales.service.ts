@@ -374,12 +374,27 @@ export class LotesFinalesService {
     const overridesMap = new Map(
       (dto.loteOverrides ?? []).map(o => [o.id, o]),
     );
+    const tienePfOverride = (id: number) => overridesMap.get(id)?.pesoPfKg != null;
+
+    // Los lotes con override de Peso Oro (PF) consumen su propia porción de
+    // merma (peso - PF), fuera del prorrateo. El resto de los lotes del
+    // batch reparte lo que QUEDA de la merma total de la operación,
+    // proporcional a SU peso combinado (no al peso del batch completo) —
+    // si se repartiera sobre el total, la suma de mermas individuales no
+    // cuadraría contra los totales que se ingresaron para la liquidación.
+    let mermaLrRestante = Number(dto.mermaReutilizableKg);
+    let mermaLdRestante = Number(dto.mermaDesechableKg);
+    let mermaLeRestante = Number(dto.sobranteExportableKg);
+    const pesoSinPfOverride = lotes.reduce(
+      (s, l) => s + (tienePfOverride(l.id) ? 0 : Number(l.cantidadKg)),
+      0,
+    );
+    const idsSinPfOverride = lotes.filter(l => !tienePfOverride(l.id)).map(l => l.id);
+    const ultimoSinPfOverrideId = idsSinPfOverride[idsSinPfOverride.length - 1];
 
     for (let i = 0; i < lotes.length; i++) {
       const lote      = lotes[i];
-      const esUltimo  = i === lotes.length - 1;
       const peso      = Number(lote.cantidadKg);
-      const proporcion = peso / pesoTotal;
       const override  = overridesMap.get(lote.id);
 
       let lr: number;
@@ -403,20 +418,24 @@ export class LotesFinalesService {
         ld = parseFloat((mermaLoteTotal - lr).toFixed(3));
         le = 0;
         skuIdFinal = override.skuId ?? dto.skuId;
-      } else if (esUltimo && !overridesMap.size) {
-        // El último lote absorbe el residuo decimal para que la suma cuadre exacto
-        const lrAcum = trillados.reduce((s, t) => s + Number(t.mermaReutilizableKg), 0);
-        const ldAcum = trillados.reduce((s, t) => s + Number(t.mermaDesechableKg), 0);
-        const leAcum = trillados.reduce((s, t) => s + Number(t.sobranteExportableKg), 0);
-        lr = parseFloat((Number(dto.mermaReutilizableKg) - lrAcum).toFixed(3));
-        ld = parseFloat((Number(dto.mermaDesechableKg)   - ldAcum).toFixed(3));
-        le = parseFloat((Number(dto.sobranteExportableKg) - leAcum).toFixed(3));
-        skuIdFinal = dto.skuId;
+        mermaLrRestante -= lr;
+        mermaLdRestante -= ld;
+      } else if (lote.id === ultimoSinPfOverrideId) {
+        // El último lote sin override absorbe el residuo (incluyendo lo que
+        // dejaron los overrides) para que la suma cuadre exacto
+        lr = parseFloat(mermaLrRestante.toFixed(3));
+        ld = parseFloat(mermaLdRestante.toFixed(3));
+        le = parseFloat(mermaLeRestante.toFixed(3));
+        skuIdFinal = override?.skuId ?? dto.skuId;
       } else {
+        const proporcion = pesoSinPfOverride > 0 ? peso / pesoSinPfOverride : 0;
         lr = parseFloat((Number(dto.mermaReutilizableKg)  * proporcion).toFixed(3));
         ld = parseFloat((Number(dto.mermaDesechableKg)    * proporcion).toFixed(3));
         le = parseFloat((Number(dto.sobranteExportableKg) * proporcion).toFixed(3));
         skuIdFinal = override?.skuId ?? dto.skuId;
+        mermaLrRestante -= lr;
+        mermaLdRestante -= ld;
+        mermaLeRestante -= le;
       }
 
       const pf = parseFloat((peso - lr - ld - le).toFixed(3));

@@ -17,7 +17,10 @@ import { UsersModule } from '../users/users.module';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: config.get<string>('JWT_EXPIRATION', '7d'),
+          // El tipo de @nestjs/jwt exige un literal tipo "7d" en vez de
+          // string — viene de una variable de entorno en runtime, así que
+          // se castea; jsonwebtoken lo parsea igual sin importar el tipo.
+          expiresIn: config.get<string>('JWT_EXPIRATION', '7d') as any,
         },
       }),
     }),

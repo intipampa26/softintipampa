@@ -1,4 +1,5 @@
 import { IsIn, IsOptional, IsString, IsNumber, IsDateString, IsBoolean } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class UpsertAlistadoDto {
   @IsOptional() @IsString()  nroContrato?: string;
@@ -25,5 +26,17 @@ export class UpsertAlistadoDto {
   @IsOptional() @IsBoolean() separarAlistado?: boolean;
   @IsOptional() @IsBoolean() planAlistado?: boolean;
   @IsOptional() @IsBoolean() costViaticos?: boolean;
-  @IsOptional() lotesAsignados?: { loteFinalId: number; codigo?: string; cantidadKg?: number | null; nroSacos?: number | null; fechaProceso?: string | null }[];
+  // Sin @Type(), el diseño de TS solo reporta "Array" (sin info del
+  // elemento) — con transform+enableImplicitConversion del ValidationPipe
+  // global, class-transformer intentaba "convertir" ese Array genérico y
+  // terminaba envolviendo/vaciando el contenido real (guardaba [[]] en vez
+  // del array de lotes). @Transform pass-through evita esa conversión.
+  // Con enableImplicitConversion del ValidationPipe global, class-transformer
+  // "convierte" este Array genérico (sin @Type(), TS solo reporta "Array" en
+  // el metadata) ANTES de aplicar @Transform — terminaba llegando ya vacío
+  // como params.value ([[]]). Se lee directo de params.obj (el objeto plano
+  // original, sin tocar) para evitar esa conversión implícita corrupta.
+  @IsOptional()
+  @Transform(({ obj, key }) => obj[key])
+  lotesAsignados?: { loteFinalId: number; codigo?: string; cantidadKg?: number | null; nroSacos?: number | null; fechaProceso?: string | null }[];
 }
