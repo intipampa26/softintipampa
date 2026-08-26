@@ -37,10 +37,10 @@ services:
       JWT_SECRET: intipampa_super_secret_jwt_key_change_in_prod
       JWT_EXPIRATION: 7d
       PORT: 3000
-      ENABLE_DELAY: "true"
+      ENABLE_DELAY: "false"
       DELAY_MS: 2000
     ports:
-      - "3001:3000"
+      - "3000:3000"
     volumes:
       - uploads_data:/app/uploads
     networks:
@@ -60,7 +60,7 @@ services:
     depends_on:
       - backend
     ports:
-      - "4000:80"
+      - "8080:80"
     networks:
       - intipampa_network
 
