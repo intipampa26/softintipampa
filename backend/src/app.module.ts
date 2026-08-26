@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -68,6 +69,10 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
 
+    // Límite global por defecto — protección base para toda la API. El
+    // endpoint de login tiene su propio límite más estricto (ver AuthController).
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -121,6 +126,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
     { provide: APP_FILTER,      useClass: AllExceptionsFilter  },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor  },
     { provide: APP_INTERCEPTOR, useClass: DelayInterceptor     },
+    { provide: APP_GUARD,       useClass: ThrottlerGuard       },
   ],
 })
 export class AppModule {}

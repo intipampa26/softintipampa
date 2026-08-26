@@ -36,6 +36,7 @@ services:
       JWT_EXPIRATION: 7d
       PORT: 3000
       ENABLE_DELAY: "false"
+      CORS_ORIGIN: https://plataforma.collectivebean.com
       DELAY_MS: 2000
     volumes:
       - uploads_data:/app/uploads
@@ -57,6 +58,10 @@ services:
       - backend
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
     networks:
       - intipampa_network
 

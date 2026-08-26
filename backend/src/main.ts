@@ -2,13 +2,24 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { join } from 'path';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  
-  
+  app.use(
+    helmet({
+      // La API se consume vía fetch/axios (no renderiza HTML propio), y el
+      // frontend se sirve desde otro contenedor/proceso — CSP por defecto de
+      // helmet solo aplicaría a respuestas HTML que esta app no genera.
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+
+
+
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
   
